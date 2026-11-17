@@ -35,6 +35,7 @@ export function Viewer() {
   useStudio((s) => s.brandKit) // re-render the booth backdrop when brand colours change
   const [support] = useState(webglSupport)
   const [lost, setLost] = useState(false)
+  const [canvasKey, setCanvasKey] = useState(0)
   const [floor, setFloor] = useState({ y: -1, r: 1 })
   const onFloor = useCallback((y: number, r: number) => setFloor({ y, r }), [])
 
@@ -45,13 +46,24 @@ export function Viewer() {
         <ViewControls />
       </div>
     )
-  if (lost) return <ContextLost />
+  if (lost)
+    return (
+      <ContextLost
+        onRestart={() => {
+          // a fresh 3D view in performance mode – the design stays in memory, nothing is lost
+          useStudio.getState().setQuality('low')
+          setCanvasKey((k) => k + 1)
+          setLost(false)
+        }}
+      />
+    )
 
   return (
     <div className="relative h-full w-full overflow-hidden transition-[background] duration-500" style={{ background: sceneCss(scene) }} aria-label={`3D preview of the ${def.name}`}>
       {/* scene decoration sits behind the 3D canvas */}
       {scene.overlay && <div className="pointer-events-none absolute inset-0" style={{ background: scene.overlay }} aria-hidden />}
       <Canvas
+        key={canvasKey}
         frameloop="demand"
         shadows={quality === 'high'}
         dpr={quality === 'high' ? [1, 2] : [1, 1]}
@@ -206,22 +218,29 @@ function Hint() {
   )
 }
 
-function ContextLost() {
+function ContextLost({ onRestart }: { onRestart: () => void }) {
+  const dirty = useStudio((s) => s.dirty)
   return (
     <div className="flex h-full items-center justify-center p-8 studio-backdrop">
       <div className="max-w-md rounded-xl border border-white/10 bg-navy-900 p-6 text-center">
         <h2 className="text-lg font-semibold text-white">The 3D view stopped</h2>
-        <p className="mt-2 text-sm text-slate-300">The graphics card ran out of memory or was reset. Your design is saved – reload to carry on. Turning on Performance mode can help on older computers.</p>
-        <button
-          type="button"
-          className="btn-primary mt-4"
-          onClick={() => {
-            useStudio.getState().setQuality('low')
-            setTimeout(() => window.location.reload(), 600)
-          }}
-        >
-          Reload in performance mode
-        </button>
+        <p className="mt-2 text-sm text-slate-300">
+          This device ran out of graphics memory. Your work is still here – don’t refresh the page. Restart the 3D view in performance mode to carry on.
+        </p>
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <button type="button" className="btn-primary" onClick={onRestart}>
+            Restart 3D view
+          </button>
+          {dirty && (
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => import('../../storage/projectFile').then((m) => m.downloadProject())}
+            >
+              Download project first
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

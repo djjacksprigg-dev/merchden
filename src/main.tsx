@@ -19,12 +19,19 @@ import { useStudio } from './state/studio'
 /** Pick performance mode automatically on obviously low-power devices. */
 function detectLowPower(): boolean {
   const nav = navigator as Navigator & { deviceMemory?: number }
+  // phones and tablets have far less graphics memory than laptops (iOS Safari
+  // drops the 3D view if it uses too much)
+  const touchOnly = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches
+  if (touchOnly || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return true
+  if (new URLSearchParams(location.search).has('performance')) return true
   if ((nav.hardwareConcurrency ?? 8) <= 2) return true
   if (nav.deviceMemory !== undefined && nav.deviceMemory <= 2) return true
   try {
     const gl = document.createElement('canvas').getContext('webgl')
     const ext = gl?.getExtension('WEBGL_debug_renderer_info')
     const r = ext && gl ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : ''
+    // free the test context straight away (browsers allow only a few)
+    gl?.getExtension('WEBGL_lose_context')?.loseContext()
     if (/swiftshader|llvmpipe|software/i.test(r)) return true
   } catch {
     /* ignore */
@@ -37,7 +44,7 @@ function boot() {
   // memory only; students keep it by downloading a .merchforge project file.
   if (detectLowPower()) {
     useStudio.getState().setQuality('low')
-    useStudio.getState().toast('Performance mode is on for this computer. You can change it in Help.', 'info')
+    useStudio.getState().toast('Performance mode is on for this device so the 3D view runs smoothly. You can change it in Help.', 'info')
   }
   startHistory()
   window.addEventListener('beforeunload', (e) => {

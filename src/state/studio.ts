@@ -8,7 +8,7 @@ import { uid } from '../lib/utils'
 
 export type ExportBackground = 'scene' | 'black' | 'white' | 'brand' | 'transparent'
 
-export type RightTab = 'brand' | 'logo' | 'text' | 'colour' | 'export'
+export type RightTab = 'brand' | 'logo' | 'text' | 'colour' | 'scene' | 'export'
 
 export interface Toast {
   id: string

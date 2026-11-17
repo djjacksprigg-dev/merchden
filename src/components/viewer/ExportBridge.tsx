@@ -16,7 +16,8 @@ export function ExportBridge() {
     const ctx = gl.getContext()
     const maxRb = ctx.getParameter(ctx.MAX_RENDERBUFFER_SIZE) as number
     const maxVp = ctx.getParameter(ctx.MAX_VIEWPORT_DIMS) as Int32Array
-    const maxSize = () => Math.max(512, Math.min(4096, maxRb || 4096, maxVp?.[0] || 4096, maxVp?.[1] || 4096))
+    // phones and tablets (performance mode) render downloads at up to 2048 px to stay within graphics memory
+    const maxSize = () => Math.max(512, Math.min(useStudio.getState().quality === 'low' ? 2048 : 4096, maxRb || 4096, maxVp?.[0] || 4096, maxVp?.[1] || 4096))
 
     const capture = ({ size, width, height, transparent, view }: CaptureOptions) => {
       const cam = camera as PerspectiveCamera
