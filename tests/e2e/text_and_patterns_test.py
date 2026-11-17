@@ -7,7 +7,6 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path=CHROME, args=['--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'])
         ctx = await b.new_context(viewport={'width':1440,'height':1000}, accept_downloads=True); pg=await ctx.new_page()
-        await pg.add_init_script("try{localStorage.setItem('mf-visited','1')}catch(e){}")
         errs=[]; pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type=='error' else None)
         await pg.goto('http://localhost:4173/'); await pg.wait_for_timeout(2500)
         await pg.get_by_role('button', name='Nova Vanguard').click(); await pg.wait_for_timeout(1000)
@@ -17,7 +16,7 @@ async def main():
             pth=f'shots/tx_{name}.png'; await pg.screenshot(path=pth, clip={'x':390,'y':90,'width':630,'height':720}); shots.append(pth)
         # 1 jersey: gamer tag + number on back, team name front
         await pg.evaluate("__studio.getState().selectProduct('jersey')"); await pg.wait_for_timeout(3000)
-        await pg.get_by_role('tab', name='Project').click(); await pg.get_by_label('Esports organisation name').fill('Nova Vanguard')
+        await pg.get_by_role('tab', name='Brand Kit').click(); await pg.get_by_label('Organisation name').fill('Nova Vanguard')
         await pg.get_by_role('tab', name='Text').click(); await pg.wait_for_timeout(400)
         await pg.get_by_role('button', name='Gamer tag + number').click(); await pg.wait_for_timeout(500)
         await pg.get_by_role('button', name='GAMERTAG').click(); await pg.wait_for_timeout(300); await pg.get_by_role('textbox', name='Text', exact=True).fill('SHADOWBYTE'); await pg.wait_for_timeout(1500)
@@ -47,7 +46,7 @@ async def main():
         await snap('mug_text','front')
         # export check: hoodie with pattern + text renders and downloads
         await pg.evaluate("__studio.getState().selectProduct('hoodie')"); await pg.wait_for_timeout(3000)
-        async with pg.expect_download() as d: await pg.get_by_role('button', name='Download image (PNG)').click()
+        async with pg.expect_download() as d: await pg.get_by_role('button', name='Export designs').click(); await pg.get_by_role('radio', name='2048 × 2048 (square)').click(); await pg.get_by_role('button', name='Download PNG (current view)').click()
         f=await d.value; await f.save_as('dl/hoodie_custom.png'); print('export', Image.open('dl/hoodie_custom.png').size, f.suggested_filename)
         # panel screenshot
         await pg.get_by_role('tab', name='Text').click(); await pg.wait_for_timeout(500)

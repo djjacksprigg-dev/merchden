@@ -222,7 +222,7 @@ export function saveToCollection(asNew = false) {
     const exists = st.collection.some((c) => c.id === design.id)
     const collection = exists ? st.collection.map((c) => (c.id === design.id ? saved : c)) : [...st.collection, saved]
     useStudio.getState().setCollection(collection)
-    useStudio.getState().toast(exists ? `Updated “${productLabel(design)}” in My designs` : `Saved “${productLabel(design)}” to My designs`, 'success')
+    useStudio.getState().toast(exists ? `Updated “${productLabel(design)}” in My collection` : `Added “${productLabel(design)}” to My collection`, 'success')
   })
 }
 

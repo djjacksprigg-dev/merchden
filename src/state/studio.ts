@@ -56,6 +56,9 @@ export interface StudioState {
   collection: SavedDesign[]
   quality: 'high' | 'low'
   autoRotate: boolean
+  /** export settings (kept while switching tabs) */
+  exportSize: string
+  exportFormat: 'png' | 'jpg'
 
   /** Zones of the currently displayed model (published by the viewer) */
   modelZones: Zone[]
@@ -235,6 +238,8 @@ export const useStudio = create<StudioState>()((set, get) => {
     collection: [],
     quality: 'high',
     autoRotate: false,
+    exportSize: 'hd',
+    exportFormat: 'png',
     modelZones: [],
     modelProductId: null,
     modelLoading: true,

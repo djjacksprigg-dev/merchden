@@ -39,7 +39,8 @@ export function CameraRig() {
     while (d > Math.PI) d -= Math.PI * 2
     while (d < -Math.PI) d += Math.PI * 2
     to.theta = from.theta + d
-    if (!Number.isFinite(from.radius) || from.radius < 0.01) {
+    const reduce = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduce || !Number.isFinite(from.radius) || from.radius < 0.01) {
       camera.position.setFromSpherical(to)
       anim.current = null
     } else {

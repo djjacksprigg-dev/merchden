@@ -9,8 +9,10 @@ import type { ViewName } from '../../lib/types'
 
 
 export function ExportPanel() {
-  const [sizeId, setSizeId] = useState('hd')
-  const [format, setFormat] = useState<ExportFormat>('png')
+  const sizeId = useStudio((s) => s.exportSize)
+  const format = useStudio((s) => s.exportFormat)
+  const setSizeId = (exportSize: string) => useStudio.setState({ exportSize })
+  const setFormat = (exportFormat: ExportFormat) => useStudio.setState({ exportFormat })
   const [max, setMax] = useState(4096)
   const size = EXPORT_SIZES.find((x) => x.id === sizeId) ?? EXPORT_SIZES[0]
   const spec: ExportSpec = { w: size.w, h: size.h, format }

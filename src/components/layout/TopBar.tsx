@@ -121,12 +121,12 @@ export function TopBar() {
           onChange={(e) => setProjectName(e.target.value)}
         />
         <span
-          className={`hidden shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium sm:inline-flex ${dirty ? 'bg-accent-soft text-orange-200' : 'bg-emerald-500/10 text-emerald-300'}`}
+          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium sm:px-2 ${dirty ? 'bg-accent-soft text-orange-200' : 'bg-emerald-500/10 text-emerald-300'}`}
           role="status"
           title={dirty ? 'You have changes that are not in a downloaded project file yet.' : 'Everything is in your last downloaded project file.'}
         >
           <span className={`h-1.5 w-1.5 rounded-full ${dirty ? 'bg-accent' : 'bg-emerald-400'}`} aria-hidden />
-          {dirty ? 'Unsaved changes' : 'Saved to file'}
+          <span className="sr-only sm:not-sr-only">{dirty ? 'Unsaved changes' : 'Saved to file'}</span>
         </span>
       </div>
 

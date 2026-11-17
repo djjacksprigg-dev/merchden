@@ -172,7 +172,8 @@ export function ProductStage({ onFloor }: { onFloor: (y: number, radius: number)
   const anim = useRef(1)
   useLayoutEffect(() => {
     if (!loaded) return
-    anim.current = useStudio.getState().renderOverride ? 1 : 0
+    const reduce = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
+    anim.current = useStudio.getState().renderOverride || reduce ? 1 : 0
     invalidate()
   }, [loaded, invalidate])
   useFrame((_, dt) => {

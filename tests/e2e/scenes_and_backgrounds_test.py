@@ -8,7 +8,6 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path=CHROME, args=['--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'])
         ctx = await b.new_context(viewport={'width':1440,'height':900}, accept_downloads=True); pg=await ctx.new_page()
-        await pg.add_init_script("try{localStorage.setItem('mf-visited','1')}catch(e){}")
         errs=[]; pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type=='error' else None)
         await pg.goto('http://localhost:4173/'); await pg.wait_for_timeout(2500)
         await pg.get_by_role('button', name='Nova Vanguard').click(); await pg.wait_for_timeout(1000)
@@ -26,7 +25,7 @@ async def main():
         outs=[]
         for sc,bg in [('neon','scene'),('retro','scene'),('arena','scene'),('pop','scene'),('studio-light','brand'),('studio-light','black'),('studio-light','white'),('studio-light','transparent')]:
             await pg.evaluate(f"__studio.getState().setScene('{sc}'); __studio.getState().setExportBackground('{bg}')"); await pg.wait_for_timeout(1200)
-            async with pg.expect_download() as d: await pg.get_by_role('button', name='Download image (PNG)').click()
+            async with pg.expect_download() as d: await pg.get_by_role('button', name='Export designs').click(); await pg.get_by_role('radio', name='2048 × 2048 (square)').click(); await pg.get_by_role('button', name='Download PNG (current view)').click()
             f=await d.value; pth=f'dl/bg_{sc}_{bg}.png'; await f.save_as(pth); outs.append(pth); await pg.wait_for_timeout(500)
         g=Image.new('RGB',(4*400,2*400),(255,0,255))
         for i,t in enumerate(outs):
