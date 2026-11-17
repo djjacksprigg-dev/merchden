@@ -82,6 +82,8 @@ The build uses relative paths (`base: './'`), so it works at a domain root or in
 3. Under *Environment variables*, add **`NODE_VERSION`** = **`20`**.
 4. Save and deploy. Every push to `main` redeploys automatically.
 
+If Cloudflare set the project up as a **Worker** (its deploy step runs `npx wrangler deploy`), that works too: `wrangler.jsonc` in this repo tells Wrangler to serve `dist/` as a static site, so it doesn't try to auto-configure Vite.
+
 No environment secrets, API keys or paid services are needed.
 
 ## Project structure

@@ -1,0 +1,11 @@
+// Cloudflare deployment settings: serves the Vite build (dist/) as a static site.
+// Having this file means `npx wrangler deploy` uses it directly instead of
+// trying to auto-configure the project.
+{
+  "name": "merchden",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
