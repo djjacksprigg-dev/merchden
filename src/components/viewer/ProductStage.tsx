@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Box3, CanvasTexture, Group, Mesh, MeshStandardMaterial, Raycaster, SRGBColorSpace, Sphere, type BufferGeometry, type Texture } from 'three'
 import type { Design, LogoLayer } from '../../lib/types'
+import { SceneProps } from './SceneProps'
 import { useStudio } from '../../state/studio'
 import { loadBuilder, patternColorsOf, PRODUCT_MAP } from '../../three/catalogue'
 import type { Part, ProductDef, ProductModel, Zone } from '../../three/engine/types'
@@ -20,6 +21,7 @@ interface Loaded {
   model: ProductModel
   radius: number
   floorY: number
+  box: { min: [number, number, number]; max: [number, number, number] }
   center: [number, number, number]
 }
 
@@ -100,6 +102,7 @@ export function ProductStage({ onFloor }: { onFloor: (y: number, radius: number)
   const design = override ?? editorDesign
   const def = PRODUCT_MAP[design.productId]
   const quality = useStudio((s) => s.quality)
+  const sceneId = useStudio((s) => s.scene)
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const loadedRef = useRef<Loaded | null>(null)
   const { invalidate } = useThree()
@@ -134,6 +137,7 @@ export function ProductStage({ onFloor }: { onFloor: (y: number, radius: number)
                 model,
                 radius: Math.max(0.3, sphere.radius),
                 floorY: box.min.y - center.y,
+                box: { min: [box.min.x, box.min.y, box.min.z], max: [box.max.x, box.max.y, box.max.z] },
                 center: [center.x, center.y, center.z],
               }
               const prev = loadedRef.current
@@ -217,6 +221,7 @@ export function ProductStage({ onFloor }: { onFloor: (y: number, radius: number)
   return (
     <group ref={group}>
       <group position={[-center[0], -center[1], -center[2]]}>
+        <SceneProps scene={sceneId} productId={def.id} box={loaded.box} radius={loaded.radius} />
         {model.parts.map((part) => (
           <PartMesh key={part.key} part={part} def={def} design={design} quality={quality} zones={model.zones} model={model} />
         ))}

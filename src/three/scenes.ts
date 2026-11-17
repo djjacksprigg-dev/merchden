@@ -164,7 +164,7 @@ export const SCENES: SceneDef[] = [
     id: 'desk',
     label: 'Gaming desk',
     swatch: 'linear-gradient(180deg,#151a26 0 58%,#ff7a1a 58% 60%,#22262f 60%)',
-    css: 'linear-gradient(180deg, #121722 0%, #0c1018 58%, rgba(255,122,26,0.55) 59.5%, #1d212a 61%, #121419 100%)',
+    css: 'linear-gradient(180deg, #121722 0%, #0b0e15 60%, #07090e 100%)',
     overlay: 'radial-gradient(ellipse 60% 25% at 50% 60%, rgba(140,80,255,0.25), transparent 70%)',
     lightText: false,
     lights: {
@@ -203,29 +203,12 @@ export const SCENES: SceneDef[] = [
         c.arc(r() * s, s * r() * 0.5, s * (0.006 + r() * 0.02), 0, Math.PI * 2)
         c.fill()
       }
-      // desk surface with an RGB light strip along the back edge
-      const desk = c.createLinearGradient(0, s * 0.6, 0, s)
-      desk.addColorStop(0, '#262a33')
-      desk.addColorStop(1, '#101216')
-      c.fillStyle = desk
+      // dim room below the wall line (the desk itself is a 3D object)
+      const low = c.createLinearGradient(0, s * 0.6, 0, s)
+      low.addColorStop(0, '#0b0e15')
+      low.addColorStop(1, '#07090e')
+      c.fillStyle = low
       c.fillRect(0, s * 0.6, s, s * 0.4)
-      const strip = c.createLinearGradient(0, 0, s, 0)
-      strip.addColorStop(0, '#8c5cff')
-      strip.addColorStop(0.5, '#ff7a1a')
-      strip.addColorStop(1, '#8c5cff')
-      c.fillStyle = strip
-      c.fillRect(0, s * 0.596, s, s * 0.008)
-      const spill = c.createLinearGradient(0, s * 0.6, 0, s * 0.75)
-      spill.addColorStop(0, 'rgba(255,122,26,0.22)')
-      spill.addColorStop(1, 'rgba(255,122,26,0)')
-      c.fillStyle = spill
-      c.fillRect(0, s * 0.6, s, s * 0.15)
-      // keyboard and mouse silhouettes on the desk
-      c.fillStyle = 'rgba(0,0,0,0.45)'
-      c.fillRect(s * 0.05, s * 0.86, s * 0.26, s * 0.06)
-      c.beginPath()
-      c.ellipse(s * 0.86, s * 0.89, s * 0.025, s * 0.035, 0, 0, Math.PI * 2)
-      c.fill()
     },
     post: (c, s) => vignette(c, s, 0.35),
   },
@@ -450,20 +433,6 @@ export const SCENES: SceneDef[] = [
       // slatted wall panel
       c.fillStyle = 'rgba(0,0,0,0.04)'
       for (let x = 0; x < s; x += s / 36) c.fillRect(x, 0, Math.max(1, s / 600), s * 0.74)
-      // display rail with hangers at the top
-      c.fillStyle = '#9a9ea6'
-      c.fillRect(s * 0.08, s * 0.08, s * 0.84, s * 0.008)
-      c.strokeStyle = 'rgba(80,80,90,0.5)'
-      c.lineWidth = s * 0.003
-      for (let i = 0; i < 9; i++) {
-        const x = s * (0.12 + i * 0.095)
-        c.beginPath()
-        c.moveTo(x, s * 0.088)
-        c.lineTo(x - s * 0.025, s * 0.12)
-        c.lineTo(x + s * 0.025, s * 0.12)
-        c.closePath()
-        c.stroke()
-      }
       // spotlight pool
       const g = c.createRadialGradient(s / 2, s * 0.35, s * 0.05, s / 2, s * 0.4, s * 0.55)
       g.addColorStop(0, 'rgba(255,250,240,0.6)')

@@ -35,6 +35,8 @@ export function ExportBridge() {
       const prevDpr = gl.getPixelRatio()
       const shadow = scene.getObjectByName('contact-shadows')
       const prevShadowVisible = shadow?.visible
+      const props = scene.getObjectByName('scene-props')
+      const prevPropsVisible = props?.visible
       const prevBg = scene.background
 
       const radius = fit?.radius ?? 1
@@ -54,7 +56,9 @@ export function ExportBridge() {
       cam.updateProjectionMatrix()
       const bgChoice = transparent ? 'transparent' : s.exportBackground
       const clear = bgChoice === 'transparent'
-      if (shadow) shadow.visible = !clear
+      if (shadow) shadow.visible = !clear && shadow.visible
+      // set dressing belongs to the environment; plain backgrounds show the product alone
+      if (props) props.visible = bgChoice === 'scene'
       scene.background = null
 
       gl.setPixelRatio(1)
@@ -75,6 +79,7 @@ export function ExportBridge() {
       cam.aspect = prevAspect
       cam.updateProjectionMatrix()
       if (shadow) shadow.visible = prevShadowVisible ?? true
+      if (props) props.visible = prevPropsVisible ?? true
       scene.background = prevBg
       gl.setPixelRatio(prevDpr)
       gl.setSize(prevSize.x, prevSize.y, false)

@@ -9,6 +9,7 @@ import { PRODUCT_MAP } from '../../three/catalogue'
 import { ProductStage } from './ProductStage'
 import { CameraRig } from './CameraRig'
 import { StudioLights } from './StudioLights'
+import { HUNG_GARMENTS, hasProps } from './SceneProps'
 import { ExportBridge } from './ExportBridge'
 import { Fallback2D } from './Fallback2D'
 import type { ViewName } from '../../lib/types'
@@ -74,7 +75,7 @@ export function Viewer() {
         }}
       >
         <Suspense fallback={null}>
-          <StudioLights quality={quality} floorY={floor.y} radius={floor.r} shadows={productId !== 'sticker'} scene={scene} />
+          <StudioLights quality={quality} floorY={floor.y} radius={floor.r} shadows={productId !== 'sticker' && !(hasProps(scene.id) && HUNG_GARMENTS.has(productId))} scene={scene} />
           <Exposure value={scene.lights.exposure} />
           <ProductStage onFloor={onFloor} />
           <CameraRig />
