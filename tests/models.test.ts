@@ -8,10 +8,13 @@ const REQUIRED = [
   'cap', 'beanie', 'bucket-hat',
   'extended-mousemat', 'mousemat', 'gaming-chair', 'headset',
   'water-bottle', 'mug', 'backpack', 'drawstring-bag', 'tote-bag', 'phone-case', 'lanyard', 'sticker',
+  // Merch Forge 2.0
+  'oversized-tee', 'varsity-jacket', 'windbreaker', 'controller-skin', 'laptop-sleeve', 'headset-stand',
+  'travel-mug', 'sports-bottle', 'tumbler', 'keyring', 'notebook', 'poster',
 ]
 
 describe('catalogue', () => {
-  it('contains all 23 required products in valid categories', () => {
+  it('contains all 35 required products in valid categories', () => {
     expect(PRODUCTS.map((p) => p.id).sort()).toEqual([...REQUIRED].sort())
     const cats = new Set(CATEGORIES.map((c) => c.id))
     for (const p of PRODUCTS) expect(cats.has(p.category)).toBe(true)
