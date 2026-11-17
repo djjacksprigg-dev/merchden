@@ -53,7 +53,7 @@ export function ExportPanel() {
         <p className="mt-1.5 text-[11px] text-slate-500">PNG keeps full quality and supports transparency. JPG files are smaller (white is used where the background would be transparent). Images are never stretched – the product is framed to fit and the background fills the frame.</p>
       </div>
       <div>
-        <p className="field-label">Look</p>
+        <p className="field-label">Mockup environment</p>
         <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Scene style">
           {SCENES.map((sc) => (
             <button
@@ -71,18 +71,18 @@ export function ExportPanel() {
             </button>
           ))}
         </div>
-        <p className="mt-1.5 text-[11px] text-slate-500">Changes the lighting and mood of the 3D view and your downloads.</p>
+        <p className="mt-1.5 text-[11px] text-slate-500">Sets the lighting and setting of the 3D view and your downloads. All environments are drawn locally – no stock photos.</p>
       </div>
       <div>
         <p className="field-label">Background</p>
         <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Export background">
           {(
             [
-              ['scene', `${SCENE_MAP[scene].label} scene`],
+              ['scene', `${SCENE_MAP[scene].label} environment`],
               ['brand', 'Team brand + logo'],
               ['black', 'Black'],
               ['white', 'White'],
-              ['transparent', 'None (transparent)'],
+              ['transparent', 'Product only (transparent)'],
             ] as [ExportBackground, string][]
           ).map(([id, label]) => (
             <button key={id} type="button" role="radio" aria-checked={bg === id} className="chip" onClick={() => setBg(id)}>

@@ -76,21 +76,49 @@ function itemName(d: Design) {
 
 /* ------------------------------------------------------------------ */
 
+export interface BoardOptions {
+  /** output size in pixels */
+  width: number
+  height: number
+  theme: 'light' | 'dark' | 'brand'
+  title?: string
+  showNotes: boolean
+}
+
+export const BOARD_FORMATS = [
+  { id: '16x9', label: '16:9 presentation (3840 × 2160)', width: 3840, height: 2160 },
+  { id: 'a3', label: 'A3 landscape (4961 × 3508, 300 dpi)', width: 4961, height: 3508 },
+] as const
+
 export async function buildPresentationSheet(items: SheetItem[], project: ProjectInfo): Promise<HTMLCanvasElement> {
+  return buildBoard(items, project, { width: 3508, height: 2480, theme: 'light', showNotes: true })
+}
+
+/** Collection board: brand header, colour palette, rationale and every product, for any page size. */
+export async function buildBoard(items: SheetItem[], project: ProjectInfo, o: BoardOptions): Promise<HTMLCanvasElement> {
+  const k = o.width / 3508
   const W = 3508
-  const H = 2480 // A4 landscape @ 300 dpi
+  const H = Math.round(o.height / k)
+  const kit = useStudio.getState().brandKit
+  const T =
+    o.theme === 'dark'
+      ? { page: '#0d111b', card: '#151c2b', cardLine: '#ffffff14', head: '#05070d', text: '#ffffff', sub: '#aab6cb', muted: '#6f7d95', accent: '#ff7a1a' }
+      : o.theme === 'brand'
+        ? { page: kit.primary, card: '#ffffff', cardLine: '#00000014', head: '#05070d', text: relativeLuminance(kit.primary) > 0.45 ? '#0b111d' : '#ffffff', sub: relativeLuminance(kit.primary) > 0.45 ? '#334155' : '#e2e8f0', muted: relativeLuminance(kit.primary) > 0.45 ? '#475569' : '#cbd5e1', accent: kit.secondary }
+        : { page: '#f4f6f9', card: '#ffffff', cardLine: '#0b111d14', head: '#0b111d', text: '#0b111d', sub: '#334155', muted: '#94a3b8', accent: '#ff7a1a' }
   const c = document.createElement('canvas')
-  c.width = W
-  c.height = H
+  c.width = o.width
+  c.height = o.height
   const ctx = c.getContext('2d')!
-  ctx.fillStyle = '#f4f6f9'
+  ctx.scale(k, k)
+  ctx.fillStyle = T.page
   ctx.fillRect(0, 0, W, H)
 
   // header band
   const HB = 360
-  ctx.fillStyle = '#0b111d'
+  ctx.fillStyle = T.head
   ctx.fillRect(0, 0, W, HB)
-  ctx.fillStyle = '#ff7a1a'
+  ctx.fillStyle = T.accent
   ctx.fillRect(0, HB - 12, W, 12)
   let tx = 140
   const logoSrc = mainLogoSrc(items)
@@ -109,21 +137,22 @@ export async function buildPresentationSheet(items: SheetItem[], project: Projec
   ctx.fillText(project.orgName || 'Esports organisation', tx, 190)
   ctx.font = `500 58px ${FONT}`
   ctx.fillStyle = '#b8c4d8'
-  ctx.fillText(project.projectName || 'Merchandise collection', tx, 275)
+  ctx.fillText([o.title || project.projectName || 'Merchandise collection', kit.slogan].filter(Boolean).join('  ·  '), tx, 275)
   ctx.textAlign = 'right'
   ctx.font = `700 44px ${FONT}`
-  ctx.fillStyle = '#ff7a1a'
+  ctx.fillStyle = T.accent === kit.secondary ? '#ffffff' : T.accent
   ctx.fillText('MERCHANDISE COLLECTION', W - 140, 175)
   ctx.font = `500 40px ${FONT}`
   ctx.fillStyle = '#93a2bb'
   ctx.fillText(`${items.length} product${items.length === 1 ? '' : 's'} · ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`, W - 140, 245)
   ctx.textAlign = 'left'
 
-  // left column
+  // left column (brand colours + rationale)
   const LX = 140
-  const LW = 860
+  const LW = o.showNotes ? 860 : -140
   let y = HB + 140
-  ctx.fillStyle = '#0b111d'
+  if (o.showNotes) {
+  ctx.fillStyle = T.text
   ctx.font = `800 46px ${FONT}`
   ctx.fillText('BRAND COLOURS', LX, y)
   y += 50
@@ -138,23 +167,24 @@ export async function buildPresentationSheet(items: SheetItem[], project: Projec
     ctx.strokeStyle = '#00000018'
     ctx.lineWidth = 3
     ctx.stroke()
-    ctx.fillStyle = '#334155'
+    ctx.fillStyle = T.sub
     ctx.font = `600 38px ${FONT}`
     ctx.fillText(col.toUpperCase(), cx, cy + sw + 56)
   })
   y += Math.ceil(palette.length / 3) * (sw + 110) + 60
 
-  ctx.fillStyle = '#0b111d'
+  ctx.fillStyle = T.text
   ctx.font = `800 46px ${FONT}`
   ctx.fillText('DESIGN RATIONALE', LX, y)
   y += 70
   ctx.font = `400 38px ${FONT}`
-  ctx.fillStyle = '#334155'
-  const rationale = project.rationale.trim() || 'Add your design rationale in the Project tab to explain your colour, logo and product choices.'
-  if (!project.rationale.trim()) ctx.fillStyle = '#94a3b8'
+  ctx.fillStyle = T.sub
+  const rationale = project.rationale.trim() || 'Add your design rationale in the Brand Kit tab to explain your colour, logo and product choices.'
+  if (!project.rationale.trim()) ctx.fillStyle = T.muted
   const lines = wrap(ctx, rationale, LW)
   const maxLines = Math.floor((H - 160 - y) / 56)
   lines.slice(0, maxLines).forEach((l, i) => ctx.fillText(i === maxLines - 1 && lines.length > maxLines ? l.replace(/\s+\S*$/, ' …') : l, LX, y + i * 56))
+  }
 
   // product grid
   const GX = LX + LW + 140
@@ -178,9 +208,9 @@ export async function buildPresentationSheet(items: SheetItem[], project: Projec
     const x = GX + col * (cellW + 50)
     const yy = GY + row * (cellH + 50)
     roundRect(ctx, x, yy, cellW, cellH, 30)
-    ctx.fillStyle = '#ffffff'
+    ctx.fillStyle = T.card
     ctx.fill()
-    ctx.strokeStyle = '#0b111d14'
+    ctx.strokeStyle = T.cardLine
     ctx.lineWidth = 3
     ctx.stroke()
     const labelH = Math.min(150, cellH * 0.2)
@@ -190,7 +220,7 @@ export async function buildPresentationSheet(items: SheetItem[], project: Projec
     drawContain(ctx, it.image, x + 18, yy + 18, cellW - 36, cellH - labelH - 36)
     ctx.restore()
     const fs = Math.max(26, Math.min(48, cellW / 14))
-    ctx.fillStyle = '#0b111d'
+    ctx.fillStyle = o.theme === 'dark' ? '#ffffff' : '#0b111d'
     ctx.font = `700 ${fs}px ${FONT}`
     ctx.fillText(fit(ctx, itemName(it.design), cellW - 60), x + 30, yy + cellH - labelH + fs * 0.9)
     // colour dots
@@ -213,9 +243,9 @@ export async function buildPresentationSheet(items: SheetItem[], project: Projec
     ctx.textAlign = 'left'
   })
 
-  ctx.fillStyle = '#94a3b8'
+  ctx.fillStyle = T.muted
   ctx.font = `500 30px ${FONT}`
-  ctx.fillText('Created with Merch Forge Studio · 3D renders of student designs', 140, H - 60)
+  ctx.fillText('Created with Merch Forge · 3D renders of student designs', 140, H - 60)
   return c
 }
 

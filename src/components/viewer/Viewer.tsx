@@ -2,7 +2,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping, PCFSoftShadowMap, SRGBColorSpace } from 'three'
 import { LoaderCircle, MousePointer2, Orbit, Palette, Pause, Play, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
-import { SCENES, SCENE_MAP } from '../../three/scenes'
+import { SCENES, SCENE_MAP, sceneCss } from '../../three/scenes'
 import { useThree } from '@react-three/fiber'
 import { useStudio } from '../../state/studio'
 import { PRODUCT_MAP } from '../../three/catalogue'
@@ -31,6 +31,7 @@ export function Viewer() {
   const def = PRODUCT_MAP[productId]
   const sceneId = useStudio((s) => s.scene)
   const scene = SCENE_MAP[sceneId] ?? SCENES[0]
+  useStudio((s) => s.brandKit) // re-render the booth backdrop when brand colours change
   const [support] = useState(webglSupport)
   const [lost, setLost] = useState(false)
   const [floor, setFloor] = useState({ y: -1, r: 1 })
@@ -46,7 +47,7 @@ export function Viewer() {
   if (lost) return <ContextLost />
 
   return (
-    <div className="relative h-full w-full overflow-hidden transition-[background] duration-500" style={{ background: scene.css }} aria-label={`3D preview of the ${def.name}`}>
+    <div className="relative h-full w-full overflow-hidden transition-[background] duration-500" style={{ background: sceneCss(scene) }} aria-label={`3D preview of the ${def.name}`}>
       {/* scene decoration sits behind the 3D canvas */}
       {scene.overlay && <div className="pointer-events-none absolute inset-0" style={{ background: scene.overlay }} aria-hidden />}
       <Canvas

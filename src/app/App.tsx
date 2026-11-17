@@ -6,6 +6,8 @@ import { CatalogueSidebar } from '../components/catalogue/CatalogueSidebar'
 import { DesignSidebar } from '../components/layout/DesignSidebar'
 import { Viewer } from '../components/viewer/Viewer'
 import { CollectionModal } from '../components/collection/CollectionModal'
+import { BoardModal } from '../components/collection/BoardModal'
+import { PortfolioPanel } from '../components/portfolio/PortfolioPanel'
 import { BusyOverlay, HelpModal, Toasts } from '../components/ui/Feedback'
 import { useStudio } from '../state/studio'
 
@@ -100,6 +102,8 @@ export function App() {
         </div>
       </div>
       <CollectionModal />
+      <BoardModal />
+      <PortfolioPanel />
       <HelpModal />
       <BusyOverlay />
       <Toasts />

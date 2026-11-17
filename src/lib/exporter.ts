@@ -10,8 +10,9 @@ import { PRODUCT_MAP } from '../three/catalogue'
 import { captureScene, maxExportSize, rendererAvailable, stageKey, waitForStage } from '../three/renderService'
 import { preloadLogos, preloadText } from '../components/viewer/useLogoImage'
 import { canvasToBlob, downloadBlob, exportFilename, nextFrame, safeName, VIEW_LABELS } from './utils'
-import { buildContactSheet, buildPresentationSheet, type SheetItem } from './sheets'
+import { buildBoard, buildContactSheet, buildPresentationSheet, BOARD_FORMATS, type BoardOptions, type SheetItem } from './sheets'
 import { composeExport } from '../components/viewer/ExportBridge'
+import { SCENE_MAP } from '../three/scenes'
 
 export type ExportFormat = 'png' | 'jpg'
 export interface ExportSpec {
@@ -156,7 +157,7 @@ export function frontBackCanvas(spec: ExportSpec, transparent: boolean, label = 
   x.drawImage(front, W / 2 - m - W * 0.005, top, m, m)
   x.drawImage(back, W / 2 + W * 0.005, top, m, m)
   if (label) {
-    const light = !transparent && (st.exportBackground === 'white' || (st.exportBackground === 'scene' && ['studio-light', 'minimal', 'white-studio', 'exhibition'].includes(st.scene)))
+    const light = !transparent && (st.exportBackground === 'white' || (st.exportBackground === 'scene' && !!SCENE_MAP[st.scene]?.lightText))
     x.fillStyle = light ? 'rgba(15,20,30,0.7)' : 'rgba(255,255,255,0.8)'
     x.font = `700 ${Math.round(H * 0.024)}px "Inter Variable", Inter, Arial, sans-serif`
     x.textAlign = 'center'
@@ -318,5 +319,43 @@ export function downloadPresentationSheet(kind: 'presentation' | 'contact') {
     const name = `${safeName(team(), 'MyTeam')}_${kind === 'presentation' ? 'PresentationSheet' : 'ContactSheet'}.png`
     downloadBlob(await canvasToBlob(canvas), name)
     useStudio.getState().toast(`Downloaded ${name}`, 'success')
+  })
+}
+
+/** Collection board (16:9 or A3 landscape) as a high-resolution PNG. Returns a small preview. */
+export async function downloadBoard(opts: { format: (typeof BOARD_FORMATS)[number]['id']; theme: BoardOptions['theme']; title: string; showNotes: boolean }) {
+  const fmt = BOARD_FORMATS.find((f) => f.id === opts.format) ?? BOARD_FORMATS[0]
+  return run('Building your collection board…', async (progress) => {
+    const designs = useStudio.getState().collection
+    if (!designs.length) throw new Error('Your collection is empty – add some products first.')
+    const items: SheetItem[] = []
+    const px = clampSize(fmt.id === 'a3' ? 1536 : 1280)
+    try {
+      for (let i = 0; i < designs.length; i++) {
+        progress(i / designs.length, `Rendering ${productLabel(designs[i])} (${i + 1} of ${designs.length})…`)
+        const c = await renderDesign(designs[i], ['three-quarter'], px, true)
+        items.push({ design: designs[i], image: c['three-quarter'] })
+      }
+    } finally {
+      await restoreEditor()
+    }
+    const canvas = await buildBoard(items, useStudio.getState().project, { width: fmt.width, height: fmt.height, theme: opts.theme, title: opts.title, showNotes: opts.showNotes })
+    const name = `${safeName(team(), 'MyTeam')}_CollectionBoard_${fmt.id === 'a3' ? 'A3' : '16x9'}.png`
+    downloadBlob(await canvasToBlob(canvas), name)
+    useStudio.getState().toast(`Downloaded ${name} (${canvas.width} × ${canvas.height})`, 'success')
+    const prev = document.createElement('canvas')
+    prev.width = 960
+    prev.height = Math.round((960 * canvas.height) / canvas.width)
+    prev.getContext('2d')!.drawImage(canvas, 0, 0, prev.width, prev.height)
+    return prev.toDataURL('image/jpeg', 0.85)
+  })
+}
+
+/** A JPEG snapshot of the current design (used for portfolio versions). */
+export async function snapshotCurrent(size = 720): Promise<string | undefined> {
+  return run('Capturing this version…', async () => {
+    await ensureEditorReady()
+    const c = captureScene({ size: clampSize(size), transparent: false, view: 'three-quarter' })
+    return c.toDataURL('image/jpeg', 0.85)
   })
 }

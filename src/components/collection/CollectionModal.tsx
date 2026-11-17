@@ -21,17 +21,18 @@ export function CollectionModal() {
   const busy = useStudio((s) => !!s.busy)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [allViews, setAllViews] = useState(false)
+  const [viewing, setViewing] = useState<string | null>(null)
 
   const views: ViewName[] = allViews ? ALL_VIEWS : ['front', 'three-quarter']
 
   return (
-    <Modal open={open} onClose={() => setOpen(false)} title="My designs" wide>
+    <Modal open={open} onClose={() => setOpen(false)} title="My collection" wide>
       <div className="flex flex-wrap items-center gap-2 border-b border-white/8 px-5 py-3">
         <button type="button" className="btn-primary" disabled={!collection.length || busy} onClick={() => downloadCollectionZip({ size: 2048, views, transparent: false, includeSheets: true })}>
           <FileArchive className="h-4 w-4" aria-hidden /> Download collection (ZIP)
         </button>
         <button type="button" className="btn-secondary" disabled={!collection.length || busy} onClick={() => downloadPresentationSheet('presentation')}>
-          <Presentation className="h-4 w-4" aria-hidden /> Presentation sheet
+          <Presentation className="h-4 w-4" aria-hidden /> A4 sheet
         </button>
         <button type="button" className="btn-secondary" disabled={!collection.length || busy} onClick={() => downloadPresentationSheet('contact')}>
           <LayoutGrid className="h-4 w-4" aria-hidden /> Contact sheet
@@ -40,7 +41,10 @@ export function CollectionModal() {
           <input type="checkbox" className="accent-[#ff7a1a]" checked={allViews} onChange={(e) => setAllViews(e.target.checked)} />
           All 4 views per product in ZIP
         </label>
-        <button type="button" className="btn-secondary" disabled={!collection.length || busy} onClick={() => setPanels({ boardOpen: true })}>
+        <button type="button" className="btn-secondary" disabled={!collection.length || busy} onClick={() => {
+            setOpen(false)
+            setPanels({ boardOpen: true })
+          }}>
           <LayoutGrid className="h-4 w-4" aria-hidden /> Collection board
         </button>
         <button type="button" className="btn-ghost ml-auto" disabled={!collection.length} onClick={() => applyBrandKit('collection')} title="Recolour every saved product with your Brand Kit colours">
@@ -63,7 +67,9 @@ export function CollectionModal() {
               return (
                 <li key={d.id} className="overflow-hidden rounded-xl border border-white/10 bg-navy-850">
                   {d.thumbnail ? (
-                    <img src={d.thumbnail} alt={`${d.title || def.name} preview`} className="aspect-square w-full object-cover" />
+                    <button type="button" className="block w-full" onClick={() => setViewing(d.id)} aria-label={`View ${d.title || def.name} larger`}>
+                      <img src={d.thumbnail} alt={`${d.title || def.name} preview`} className="aspect-square w-full object-cover" />
+                    </button>
                   ) : (
                     <div className="flex aspect-square items-center justify-center bg-navy-800 text-xs text-slate-500">Preview generated on next save</div>
                   )}
@@ -140,6 +146,28 @@ export function CollectionModal() {
           Your collection lives in this browser tab only and is never uploaded. Use <strong>Download project</strong> in the top bar to keep it, and <strong>Import project</strong> next time.
         </p>
       </div>
+      {viewing && (() => {
+        const d = collection.find((c) => c.id === viewing)
+        if (!d) return null
+        return (
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-6" role="dialog" aria-label={`${d.title} preview`} onClick={() => setViewing(null)}>
+            <figure className="max-h-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
+              <img src={d.thumbnail} alt={`${d.title} preview`} className="max-h-[75vh] rounded-xl" />
+              <figcaption className="mt-3 flex items-center justify-between gap-4 text-sm text-white">
+                <span className="font-semibold">{d.title}</span>
+                <span className="flex gap-2">
+                  <button type="button" className="btn-secondary px-3 py-1.5 text-xs" onClick={() => editSaved(d.id)}>
+                    <Pencil className="h-3.5 w-3.5" aria-hidden /> Edit
+                  </button>
+                  <button type="button" className="btn-ghost px-3 py-1.5 text-xs" onClick={() => setViewing(null)} autoFocus>
+                    Close
+                  </button>
+                </span>
+              </figcaption>
+            </figure>
+          </div>
+        )
+      })()}
     </Modal>
   )
 }

@@ -4,7 +4,15 @@
  * exported images. Everything is procedural (no image files).
  */
 
-export type SceneId = 'studio-light' | 'studio-dark' | 'neon' | 'retro' | 'arena' | 'pop'
+export type SceneId = 'studio-light' | 'studio-dark' | 'desk' | 'arena' | 'display' | 'exhibition' | 'minimal' | 'neon' | 'retro' | 'pop'
+
+import { useStudio } from '../state/studio'
+
+/** Brand colours for environments that show the team's colours (read at paint time). */
+function brand() {
+  const k = useStudio.getState().brandKit
+  return { primary: k.primary, secondary: k.secondary, accent: k.accent }
+}
 
 export interface SceneLights {
   env: string
@@ -68,6 +76,19 @@ function grain(ctx: CanvasRenderingContext2D, s: number, amount: number) {
   ctx.putImageData(img, 0, 0)
 }
 
+function grainRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, amount: number) {
+  if (w <= 0 || h <= 0) return
+  const img = ctx.getImageData(x, y, w, h)
+  const r = rand(3)
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (r() - 0.5) * amount
+    img.data[i] += n
+    img.data[i + 1] += n
+    img.data[i + 2] += n
+  }
+  ctx.putImageData(img, x, y)
+}
+
 function vignette(ctx: CanvasRenderingContext2D, s: number, strength: number) {
   const g = ctx.createRadialGradient(s / 2, s / 2, s * 0.35, s / 2, s / 2, s * 0.75)
   g.addColorStop(0, 'rgba(0,0,0,0)')
@@ -85,7 +106,7 @@ function scanlines(ctx: CanvasRenderingContext2D, s: number, alpha: number) {
 export const SCENES: SceneDef[] = [
   {
     id: 'studio-light',
-    label: 'Studio',
+    label: 'White studio',
     swatch: 'linear-gradient(135deg,#ffffff,#dfe1e5)',
     css: 'radial-gradient(ellipse 75% 65% at 50% 42%, #ffffff 0%, #f1f2f4 45%, #dfe1e5 100%)',
     lightText: true,
@@ -138,6 +159,75 @@ export const SCENES: SceneDef[] = [
         [0.55, '#141b28'],
         [1, '#090d14'],
       ]),
+  },
+  {
+    id: 'desk',
+    label: 'Gaming desk',
+    swatch: 'linear-gradient(180deg,#151a26 0 58%,#ff7a1a 58% 60%,#22262f 60%)',
+    css: 'linear-gradient(180deg, #121722 0%, #0c1018 58%, rgba(255,122,26,0.55) 59.5%, #1d212a 61%, #121419 100%)',
+    overlay: 'radial-gradient(ellipse 60% 25% at 50% 60%, rgba(140,80,255,0.25), transparent 70%)',
+    lightText: false,
+    lights: {
+      env: '#1a1d26',
+      top: 1.8,
+      key: ['#fff1e6', 2.2],
+      fill: ['#c9b8ff', 0.9],
+      rimL: ['#ff7a1a', 2.6],
+      rimR: ['#8c5cff', 2.6],
+      floor: 0.5,
+      hemiSky: '#e8e2ff',
+      hemiGround: '#1d212a',
+      hemi: 0.3,
+      dir: ['#ffffff', 1.1],
+      shadow: 0.6,
+      exposure: 1,
+    },
+    paint: (c, s) => {
+      const wall = c.createLinearGradient(0, 0, 0, s * 0.6)
+      wall.addColorStop(0, '#151a26')
+      wall.addColorStop(1, '#0b0f17')
+      c.fillStyle = wall
+      c.fillRect(0, 0, s, s * 0.6)
+      // acoustic panels on the wall
+      c.fillStyle = 'rgba(255,255,255,0.035)'
+      for (let i = 0; i < 6; i++) {
+        const x = s * (0.06 + (i % 3) * 0.32)
+        const y = s * (0.06 + Math.floor(i / 3) * 0.24)
+        c.fillRect(x, y, s * 0.24, s * 0.2)
+      }
+      // LED bokeh on the wall
+      const r = rand(11)
+      for (let i = 0; i < 40; i++) {
+        c.fillStyle = r() > 0.5 ? `rgba(255,122,26,${0.05 + r() * 0.1})` : `rgba(140,92,255,${0.05 + r() * 0.1})`
+        c.beginPath()
+        c.arc(r() * s, s * r() * 0.5, s * (0.006 + r() * 0.02), 0, Math.PI * 2)
+        c.fill()
+      }
+      // desk surface with an RGB light strip along the back edge
+      const desk = c.createLinearGradient(0, s * 0.6, 0, s)
+      desk.addColorStop(0, '#262a33')
+      desk.addColorStop(1, '#101216')
+      c.fillStyle = desk
+      c.fillRect(0, s * 0.6, s, s * 0.4)
+      const strip = c.createLinearGradient(0, 0, s, 0)
+      strip.addColorStop(0, '#8c5cff')
+      strip.addColorStop(0.5, '#ff7a1a')
+      strip.addColorStop(1, '#8c5cff')
+      c.fillStyle = strip
+      c.fillRect(0, s * 0.596, s, s * 0.008)
+      const spill = c.createLinearGradient(0, s * 0.6, 0, s * 0.75)
+      spill.addColorStop(0, 'rgba(255,122,26,0.22)')
+      spill.addColorStop(1, 'rgba(255,122,26,0)')
+      c.fillStyle = spill
+      c.fillRect(0, s * 0.6, s, s * 0.15)
+      // keyboard and mouse silhouettes on the desk
+      c.fillStyle = 'rgba(0,0,0,0.45)'
+      c.fillRect(s * 0.05, s * 0.86, s * 0.26, s * 0.06)
+      c.beginPath()
+      c.ellipse(s * 0.86, s * 0.89, s * 0.025, s * 0.035, 0, 0, Math.PI * 2)
+      c.fill()
+    },
+    post: (c, s) => vignette(c, s, 0.35),
   },
   {
     id: 'neon',
@@ -277,7 +367,7 @@ export const SCENES: SceneDef[] = [
   },
   {
     id: 'arena',
-    label: 'Arena',
+    label: 'Esports stage',
     swatch: 'radial-gradient(circle at 50% 20%,#4d7cff,#05070d)',
     css: 'radial-gradient(ellipse 35% 70% at 50% 0%, rgba(120,160,255,0.45) 0%, transparent 70%), radial-gradient(ellipse 80% 40% at 50% 92%, #1b2a55 0%, transparent 70%), #04060c',
     overlay: 'radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%)',
@@ -329,6 +419,173 @@ export const SCENES: SceneDef[] = [
       }
     },
     post: (c, s) => vignette(c, s, 0.6),
+  },
+  {
+    id: 'display',
+    label: 'Clothing display',
+    swatch: 'linear-gradient(180deg,#e9e3d9 0 72%,#c9a77c 72%)',
+    css: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.035) 0 2px, transparent 2px 46px), linear-gradient(180deg, #f1ece4 0%, #e5ded2 74%, #cfae86 74.5%, #b8936a 100%)',
+    lightText: true,
+    lights: {
+      env: '#c9ccd1',
+      top: 2.2,
+      key: ['#ffffff', 2.6],
+      fill: ['#ffffff', 1.1],
+      rimL: ['#ffffff', 1.4],
+      rimR: ['#ffffff', 1.4],
+      floor: 0.9,
+      hemiSky: '#ffffff',
+      hemiGround: '#d9dadc',
+      hemi: 0.35,
+      dir: ['#ffffff', 1.15],
+      shadow: 0.38,
+      exposure: 1,
+    },
+    paint: (c, s) => {
+      const wall = c.createLinearGradient(0, 0, 0, s * 0.74)
+      wall.addColorStop(0, '#f3eee6')
+      wall.addColorStop(1, '#e2dacd')
+      c.fillStyle = wall
+      c.fillRect(0, 0, s, s * 0.74)
+      // slatted wall panel
+      c.fillStyle = 'rgba(0,0,0,0.04)'
+      for (let x = 0; x < s; x += s / 36) c.fillRect(x, 0, Math.max(1, s / 600), s * 0.74)
+      // display rail with hangers at the top
+      c.fillStyle = '#9a9ea6'
+      c.fillRect(s * 0.08, s * 0.08, s * 0.84, s * 0.008)
+      c.strokeStyle = 'rgba(80,80,90,0.5)'
+      c.lineWidth = s * 0.003
+      for (let i = 0; i < 9; i++) {
+        const x = s * (0.12 + i * 0.095)
+        c.beginPath()
+        c.moveTo(x, s * 0.088)
+        c.lineTo(x - s * 0.025, s * 0.12)
+        c.lineTo(x + s * 0.025, s * 0.12)
+        c.closePath()
+        c.stroke()
+      }
+      // spotlight pool
+      const g = c.createRadialGradient(s / 2, s * 0.35, s * 0.05, s / 2, s * 0.4, s * 0.55)
+      g.addColorStop(0, 'rgba(255,250,240,0.6)')
+      g.addColorStop(1, 'rgba(255,250,240,0)')
+      c.fillStyle = g
+      c.fillRect(0, 0, s, s * 0.74)
+      // light oak floor
+      const floor = c.createLinearGradient(0, s * 0.74, 0, s)
+      floor.addColorStop(0, '#d2b48e')
+      floor.addColorStop(1, '#b38d63')
+      c.fillStyle = floor
+      c.fillRect(0, s * 0.74, s, s * 0.26)
+      c.fillStyle = 'rgba(0,0,0,0.05)'
+      for (let x = 0; x < s; x += s / 9) c.fillRect(x, s * 0.74, Math.max(1, s / 500), s * 0.26)
+    },
+    post: (c, s) => vignette(c, s, 0.12),
+  },
+  {
+    id: 'exhibition',
+    label: 'Merch exhibition',
+    swatch: 'linear-gradient(135deg,#1d2b4f 0 50%,#ff7a1a 50%)',
+    css: 'linear-gradient(180deg, #2a2f3a 0 6%, transparent 6%), linear-gradient(115deg, #1d2b4f 0 55%, #ff7a1a 55% 61%, #1d2b4f 61%), #1d2b4f',
+    overlay: 'linear-gradient(180deg, transparent 76%, rgba(40,44,52,0.85) 76%), radial-gradient(ellipse 50% 40% at 50% 45%, rgba(255,255,255,0.18), transparent 70%)',
+    lightText: false,
+    lights: {
+      env: '#2a2f38',
+      top: 2.4,
+      key: ['#ffffff', 2.6],
+      fill: ['#ffffff', 1.1],
+      rimL: ['#ffffff', 1.6],
+      rimR: ['#ffffff', 1.6],
+      floor: 0.5,
+      hemiSky: '#ffffff',
+      hemiGround: '#30343c',
+      hemi: 0.35,
+      dir: ['#ffffff', 1.2],
+      shadow: 0.5,
+      exposure: 1,
+    },
+    paint: (c, s) => {
+      const b = brand()
+      c.fillStyle = b.primary
+      c.fillRect(0, 0, s, s)
+      // diagonal brand-colour stripes on the booth backdrop
+      c.save()
+      c.fillStyle = b.secondary
+      c.beginPath()
+      c.moveTo(s * 0.62, 0)
+      c.lineTo(s * 0.7, 0)
+      c.lineTo(s * 0.45, s * 0.76)
+      c.lineTo(s * 0.37, s * 0.76)
+      c.closePath()
+      c.fill()
+      c.globalAlpha = 0.5
+      c.fillStyle = b.accent
+      c.beginPath()
+      c.moveTo(s * 0.73, 0)
+      c.lineTo(s * 0.75, 0)
+      c.lineTo(s * 0.5, s * 0.76)
+      c.lineTo(s * 0.48, s * 0.76)
+      c.closePath()
+      c.fill()
+      c.restore()
+      // soft light on the backdrop
+      const g = c.createRadialGradient(s / 2, s * 0.42, s * 0.05, s / 2, s * 0.45, s * 0.6)
+      g.addColorStop(0, 'rgba(255,255,255,0.22)')
+      g.addColorStop(1, 'rgba(0,0,0,0.25)')
+      c.fillStyle = g
+      c.fillRect(0, 0, s, s * 0.76)
+      // lighting truss
+      c.fillStyle = '#3a3f4a'
+      c.fillRect(0, 0, s, s * 0.05)
+      c.strokeStyle = '#555b68'
+      c.lineWidth = s * 0.003
+      for (let x = 0; x < s; x += s * 0.04) {
+        c.beginPath()
+        c.moveTo(x, 0)
+        c.lineTo(x + s * 0.02, s * 0.05)
+        c.lineTo(x + s * 0.04, 0)
+        c.stroke()
+      }
+      // carpet floor
+      const floor = c.createLinearGradient(0, s * 0.76, 0, s)
+      floor.addColorStop(0, '#3b3f48')
+      floor.addColorStop(1, '#23262c')
+      c.fillStyle = floor
+      c.fillRect(0, s * 0.76, s, s * 0.24)
+      grainRect(c, 0, Math.round(s * 0.76), s, Math.round(s * 0.24), 10)
+    },
+    post: (c, s) => vignette(c, s, 0.3),
+  },
+  {
+    id: 'minimal',
+    label: 'Minimalist',
+    swatch: 'radial-gradient(circle at 50% 45%,#e8dfd3 35%,#f6f3ee 36%)',
+    css: 'radial-gradient(circle at 50% 44%, #ebe3d8 0 28%, transparent 28.3%), linear-gradient(180deg, #f6f3ee 0 80%, #ece7df 80%)',
+    lightText: true,
+    lights: {
+      env: '#c9ccd1',
+      top: 2.2,
+      key: ['#ffffff', 2.6],
+      fill: ['#ffffff', 1.1],
+      rimL: ['#ffffff', 1.4],
+      rimR: ['#ffffff', 1.4],
+      floor: 0.9,
+      hemiSky: '#ffffff',
+      hemiGround: '#d9dadc',
+      hemi: 0.35,
+      dir: ['#ffffff', 1.15],
+      shadow: 0.38,
+      exposure: 1,
+    },
+    paint: (c, s) => {
+      c.fillStyle = '#f6f3ee'
+      c.fillRect(0, 0, s, s)
+      c.fillStyle = '#ebe3d8'
+      c.beginPath()
+      c.arc(s / 2, s * 0.44, s * 0.3, 0, Math.PI * 2)
+      c.fill()
+      c.fillStyle = '#ece7df'
+      c.fillRect(0, s * 0.8, s, s * 0.2)
+    },
   },
   {
     id: 'pop',
@@ -387,6 +644,9 @@ export const SCENES: SceneDef[] = [
   },
 ]
 
+const ORDER: SceneId[] = ['studio-light', 'studio-dark', 'desk', 'arena', 'display', 'exhibition', 'minimal', 'neon', 'retro', 'pop']
+SCENES.sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id))
+
 export const SCENE_MAP: Record<SceneId, SceneDef> = Object.fromEntries(SCENES.map((s) => [s.id, s])) as Record<SceneId, SceneDef>
 
 /** Adds a neon glow around the product (drawn from the product's own alpha). */
@@ -415,4 +675,11 @@ export function glowLayer(product: HTMLCanvasElement, colors: [string, string], 
   ctx.drawImage(a, -size * 0.004, 0)
   ctx.drawImage(b, size * 0.004, 0)
   return out
+}
+
+/** Viewer background for a scene (the exhibition booth uses the team's Brand Kit colours). */
+export function sceneCss(scene: SceneDef): string {
+  if (scene.id !== 'exhibition') return scene.css
+  const b = brand()
+  return `linear-gradient(180deg, #3a3f4a 0 5%, transparent 5%), linear-gradient(115deg, ${b.primary} 0 55%, ${b.secondary} 55% 61%, ${b.primary} 61%), ${b.primary}`
 }

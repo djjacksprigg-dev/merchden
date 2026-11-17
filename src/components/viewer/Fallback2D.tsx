@@ -22,7 +22,7 @@ import { bakeAmbientOcclusion } from '../../three/engine/ao'
 import { markStageReady, registerRenderer, stageKey, type CaptureOptions } from '../../three/renderService'
 import { preloadLogos, preloadText } from './useLogoImage'
 import { composeExport } from './ExportBridge'
-import { SCENES, SCENE_MAP } from '../../three/scenes'
+import { SCENES, SCENE_MAP, sceneCss } from '../../three/scenes'
 
 interface Loaded {
   id: string
@@ -341,7 +341,7 @@ export function Fallback2D() {
   }, [])
 
   return (
-    <div ref={host} className="relative h-full w-full overflow-hidden" style={{ background: scene.css }} aria-label={`2D preview of the ${def.name}`}>
+    <div ref={host} className="relative h-full w-full overflow-hidden" style={{ background: sceneCss(scene) }} aria-label={`2D preview of the ${def.name}`}>
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" role="img" aria-label={`${def.name}, ${view.replace('-', ' ')} view`} />
       <div className="absolute left-1/2 top-3 flex max-w-[90%] -translate-x-1/2 items-start gap-2 rounded-lg border border-amber-400/30 bg-navy-900/90 px-3 py-2 text-xs text-amber-100 shadow-lg" role="note">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" aria-hidden />
