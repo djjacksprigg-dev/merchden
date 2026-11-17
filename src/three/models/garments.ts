@@ -4,7 +4,7 @@
  * swept tubes; pockets, collars, zips and trims are patches that lie exactly on
  * the garment surface. Shown ghost-mannequin style, like product photography.
  */
-import { SphereGeometry, Vector3 } from 'three'
+import { TorusGeometry, SphereGeometry, Vector3 } from 'three'
 import {
   bump,
   clamp,
@@ -520,19 +520,33 @@ function buildTop(kind: AnyKind): ProductModel {
     hood.computeVertexNormals()
     parts.push({ key: 'hood', geometry: hood, finish: kind === 'windbreaker' ? 'nylon' : 'fleece', slot: kind === 'windbreaker' ? 'secondary' : 'primary', pattern: kind === 'windbreaker' ? undefined : 'wrap', patternFront: 0 })
     parts.push({ key: 'hood-lining', geometry: hood.clone(), finish: kind === 'windbreaker' ? 'nylon' : 'cotton', slot: kind === 'windbreaker' ? 'secondary' : 'accent', backSide: true })
-    // drawcords
+    // drawcords: they come out of metal eyelets at the neckline and lie on the
+    // fabric (sampled along the draped surface, offset by the cord's radius)
+    const R = 0.0085
+    const cordEnd = 0.6
     const cords = [0.468, 0.532].map((u) => {
       const s = u < 0.5 ? -1 : 1
-      return createTube(
-        [body.point(u, 0.985, 0.022), body.point(u - s * 0.004, 0.86, 0.026), body.point(u - s * 0.006, 0.72, 0.03), body.point(u - s * 0.007, 0.6, 0.034)],
-        0.0085,
-        { radial: 10, segments: 24, capEnd: true },
-      ).geometry
+      const pts = [body.point(u, 0.99, -0.004), body.point(u, 0.975, R * 0.6)]
+      for (let i = 1; i <= 10; i++) {
+        const v = lerp(0.975, cordEnd, i / 10)
+        // a slight inward swing as the cords hang, and a little extra lift lower down
+        pts.push(body.point(u - s * 0.007 * (i / 10), v, R + 0.0015 + 0.003 * (i / 10)))
+      }
+      return createTube(pts, R, { radial: 10, segments: 40, capEnd: true }).geometry
+    })
+    const eyelets = [0.468, 0.532].map((u) => {
+      const ring = new TorusGeometry(0.014, 0.0045, 8, 20)
+      const p0 = body.point(u, 0.975, 0.002)
+      const n = body.normal(u, 0.975)
+      ring.lookAt(n)
+      ring.translate(p0.x, p0.y, p0.z)
+      return ring
     })
     const aglets = [0.461, 0.539].map((u) => {
-      const p0 = body.point(u, 0.6, 0.034)
+      const p0 = body.point(u, cordEnd, R + 0.0045)
       return createTube([p0.clone().add(V(0, 0.01, 0)), p0.clone().add(V(0, -0.045, 0.002))], 0.0105, { radial: 10, segments: 2, capEnd: true, capStart: true }).geometry
     })
+    parts.push({ key: 'eyelets', geometry: merge(eyelets), finish: 'metal', color: kind === 'windbreaker' ? '#16181d' : '#c0c4cc' })
     parts.push({ key: 'drawcords', geometry: merge(cords), finish: 'cotton', slot: kind === 'windbreaker' ? 'trim' : 'accent' })
     parts.push({ key: 'aglets', geometry: merge(aglets), finish: kind === 'windbreaker' ? 'plastic' : 'metal', color: kind === 'windbreaker' ? '#16181d' : '#c0c4cc' })
   }
