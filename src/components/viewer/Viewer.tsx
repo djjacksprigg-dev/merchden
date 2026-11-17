@@ -1,7 +1,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping, PCFSoftShadowMap, SRGBColorSpace } from 'three'
-import { Box, LoaderCircle, MousePointer2, Orbit, Palette, Pause, Play, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
+import { LoaderCircle, MousePointer2, Orbit, Palette, Pause, Play, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
 import { SCENES, SCENE_MAP } from '../../three/scenes'
 import { useThree } from '@react-three/fiber'
 import { useStudio } from '../../state/studio'
@@ -10,6 +10,7 @@ import { ProductStage } from './ProductStage'
 import { CameraRig } from './CameraRig'
 import { StudioLights } from './StudioLights'
 import { ExportBridge } from './ExportBridge'
+import { Fallback2D } from './Fallback2D'
 import type { ViewName } from '../../lib/types'
 
 export function webglSupport(): 'webgl2' | 'webgl' | null {
@@ -35,7 +36,13 @@ export function Viewer() {
   const [floor, setFloor] = useState({ y: -1, r: 1 })
   const onFloor = useCallback((y: number, r: number) => setFloor({ y, r }), [])
 
-  if (!support) return <NoWebGL />
+  if (!support)
+    return (
+      <div className="relative h-full w-full">
+        <Fallback2D />
+        <ViewControls />
+      </div>
+    )
   if (lost) return <ContextLost />
 
   return (
@@ -110,8 +117,8 @@ function ViewControls() {
     () => [
       { id: 'front', label: 'Front' },
       { id: 'back', label: 'Back' },
-      { id: 'side', label: def.sideLabel ?? 'Left' },
-      ...(def.sideLabel ? [] : [{ id: 'right' as ViewName, label: 'Right' }]),
+      { id: 'side', label: def.sideLabel ?? def.sideLabels?.[0] ?? 'Left' },
+      ...(def.sideLabel ? [] : [{ id: 'right' as ViewName, label: def.sideLabels?.[1] ?? 'Right' }]),
       { id: 'three-quarter', label: '¾' },
     ],
     [def],
@@ -119,7 +126,7 @@ function ViewControls() {
   return (
     <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-white/10 bg-navy-900/85 p-1 shadow-lg backdrop-blur" role="toolbar" aria-label="Camera views">
       {views.map((v) => (
-        <button key={v.id} type="button" className="view-btn" onClick={() => requestView(v.id)} aria-label={`${v.id === 'three-quarter' ? 'Three-quarter' : v.id === 'side' && !def.sideLabel ? 'Left side' : v.id === 'right' ? 'Right side' : v.label} view`}>
+        <button key={v.id} type="button" className="view-btn" onClick={() => requestView(v.id)} aria-label={`${v.id === 'three-quarter' ? 'Three-quarter' : v.id === 'side' && !def.sideLabel && !def.sideLabels ? 'Left side' : v.id === 'right' && !def.sideLabels ? 'Right side' : v.label} view`}>
           {v.label}
         </button>
       ))}
@@ -193,21 +200,6 @@ function Hint() {
       <p className="mt-1 flex items-center gap-2">
         <MousePointer2 className="h-3.5 w-3.5 text-accent" aria-hidden /> Grab a logo or text on the product to drag it · double-click to jump it there
       </p>
-    </div>
-  )
-}
-
-function NoWebGL() {
-  return (
-    <div className="flex h-full items-center justify-center p-8 studio-backdrop">
-      <div className="max-w-md rounded-xl border border-white/10 bg-navy-900 p-6 text-center">
-        <Box className="mx-auto mb-3 h-8 w-8 text-accent" aria-hidden />
-        <h2 className="text-lg font-semibold text-white">3D graphics are not available</h2>
-        <p className="mt-2 text-sm text-slate-300">
-          This browser or computer has WebGL switched off, so the 3D preview cannot start. Try an up-to-date Chrome, Edge, Firefox or Safari, check that hardware acceleration is turned on in
-          the browser settings, or ask IT whether WebGL is blocked on this machine.
-        </p>
-      </div>
     </div>
   )
 }

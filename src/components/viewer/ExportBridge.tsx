@@ -18,12 +18,15 @@ export function ExportBridge() {
     const maxVp = ctx.getParameter(ctx.MAX_VIEWPORT_DIMS) as Int32Array
     const maxSize = () => Math.max(512, Math.min(4096, maxRb || 4096, maxVp?.[0] || 4096, maxVp?.[1] || 4096))
 
-    const capture = ({ size, transparent, view }: CaptureOptions) => {
+    const capture = ({ size, width, height, transparent, view }: CaptureOptions) => {
       const cam = camera as PerspectiveCamera
       const s = useStudio.getState()
       const fit = s.stageFit
       const def = PRODUCT_MAP[(s.renderOverride ?? s.design).productId]
-      const px = Math.min(size, maxSize())
+      const W = Math.round(width ?? size)
+      const H = Math.round(height ?? size)
+      // the product is rendered square at the shorter side, then composed onto the full frame
+      const px = Math.min(Math.min(W, H), maxSize())
 
       const prevPos = cam.position.clone()
       const prevQuat = cam.quaternion.clone()
@@ -64,7 +67,7 @@ export function ExportBridge() {
       product.width = px
       product.height = px
       product.getContext('2d')!.drawImage(gl.domElement, 0, 0, px, px)
-      const out = composeExport(product, px, bgChoice)
+      const out = composeExport(product, W, H, bgChoice)
 
       // restore
       cam.position.copy(prevPos)
@@ -91,25 +94,34 @@ export function ExportBridge() {
  * Builds the final image: background (scene / black / white / team brand / none),
  * neon glow, the rendered product, team branding and the scene's finishing pass.
  */
-export function composeExport(product: HTMLCanvasElement, px: number, bg: ExportBackground): HTMLCanvasElement {
+export function composeExport(product: HTMLCanvasElement, W: number, H: number = W, bg: ExportBackground): HTMLCanvasElement {
   const st = useStudio.getState()
   const scene = SCENE_MAP[st.scene] ?? SCENES[0]
-  const out = document.createElement('canvas')
-  out.width = px
-  out.height = px
-  const c = out.getContext('2d')!
-  if (bg === 'scene') scene.paint(c, px)
+  const S = Math.max(W, H)
+  const m = product.width
+  // backgrounds and finishing passes are square designs: paint at the long side and crop the centre
+  const sq = document.createElement('canvas')
+  sq.width = sq.height = S
+  const c = sq.getContext('2d')!
+  if (bg === 'scene') scene.paint(c, S)
   else if (bg === 'black') {
     c.fillStyle = '#000000'
-    c.fillRect(0, 0, px, px)
+    c.fillRect(0, 0, S, S)
   } else if (bg === 'white') {
     c.fillStyle = '#ffffff'
-    c.fillRect(0, 0, px, px)
-  } else if (bg === 'brand') paintBrand(c, px, 'back')
-  if (scene.glow && bg !== 'white') c.drawImage(glowLayer(product, scene.glow, px), 0, 0)
-  c.drawImage(product, 0, 0)
-  if (bg === 'brand') paintBrand(c, px, 'front')
-  if (bg === 'scene' && scene.post) scene.post(c, px)
+    c.fillRect(0, 0, S, S)
+  } else if (bg === 'brand') paintBrand(c, S, S, 'back')
+  const ox = (S - m) / 2
+  const oy = (S - m) / 2
+  if (scene.glow && bg !== 'white') c.drawImage(glowLayer(product, scene.glow, m), ox, oy)
+  c.drawImage(product, ox, oy)
+  if (bg === 'scene' && scene.post) scene.post(c, S)
+  const out = document.createElement('canvas')
+  out.width = W
+  out.height = H
+  const o = out.getContext('2d')!
+  o.drawImage(sq, (S - W) / 2, (S - H) / 2, W, H, 0, 0, W, H)
+  if (bg === 'brand') paintBrand(o, W, H, 'front')
   return out
 }
 
@@ -124,8 +136,9 @@ function brandAssets() {
 }
 
 /** Team-branded background: team colours, a large faded logo, and the logo + name in the corner. */
-function paintBrand(c: CanvasRenderingContext2D, s: number, layer: 'back' | 'front') {
+function paintBrand(c: CanvasRenderingContext2D, w: number, h: number, layer: 'back' | 'front') {
   const { logo, primary, secondary, name } = brandAssets()
+  const s = Math.min(w, h)
   if (layer === 'back') {
     const g = c.createLinearGradient(0, 0, s, s)
     g.addColorStop(0, primary)
@@ -149,10 +162,10 @@ function paintBrand(c: CanvasRenderingContext2D, s: number, layer: 'back' | 'fro
   const pad = s * 0.045
   let x = pad
   if (logo) {
-    const h = s * 0.085
-    const w = (logo.naturalWidth / logo.naturalHeight) * h
-    c.drawImage(logo, pad, s - pad - h, w, h)
-    x = pad + w + s * 0.018
+    const lh = s * 0.085
+    const lw = (logo.naturalWidth / logo.naturalHeight) * lh
+    c.drawImage(logo, pad, h - pad - lh, lw, lh)
+    x = pad + lw + s * 0.018
   }
   if (name) {
     c.fillStyle = '#ffffff'
@@ -160,7 +173,7 @@ function paintBrand(c: CanvasRenderingContext2D, s: number, layer: 'back' | 'fro
     c.textBaseline = 'middle'
     c.shadowColor = 'rgba(0,0,0,0.4)'
     c.shadowBlur = s * 0.006
-    c.fillText(name.toUpperCase(), x, s - pad - s * 0.0425)
+    c.fillText(name.toUpperCase(), x, h - pad - s * 0.0425)
     c.shadowBlur = 0
   }
 }

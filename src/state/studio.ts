@@ -191,7 +191,8 @@ export const useStudio = create<StudioState>()((set, get) => {
     if (slots.has('secondary') && d.productId !== 'mug') colors.secondary = kit.secondary
     if (slots.has('accent')) colors.accent = kit.accent
     if (slots.has('trim')) colors.trim = kit.accent
-    if (slots.has('sleeve')) colors.sleeve = kit.accent
+    if (slots.has('sleeve')) colors.sleeve = d.productId === 'varsity-jacket' ? kit.accent : kit.primary
+    if (slots.has('collar')) colors.collar = kit.accent
     const pc = def.patternColors
     if (!pc) {
       colors.pattern = kit.secondary
@@ -411,7 +412,7 @@ export const useStudio = create<StudioState>()((set, get) => {
       return layer.id
     },
     updateText: (id, patch) =>
-      patchDesign((d) => ({ ...d, layers: d.layers.map((l) => (l.id === id && l.text ? { ...l, text: { ...l.text, ...patch } } : l)) })),
+      patchDesign((d) => ({ ...d, layers: d.layers.map((l) => (l.id === id && l.text && !l.locked ? { ...l, text: { ...l.text, ...patch } } : l)) })),
     addPatternImage: (img) => {
       set((s) => ({ logos: { ...s.logos, [img.id]: { ...img, purpose: 'pattern' } } }))
       patchDesign((d) => ({ ...d, pattern: 'custom', customPatternId: img.id, customPatternMode: d.customPatternMode ?? 'tile' }))

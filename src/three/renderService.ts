@@ -6,7 +6,11 @@
 import type { ViewName } from '../lib/types'
 
 export interface CaptureOptions {
+  /** Square output size in pixels (used when width/height are not given) */
   size: number
+  /** Optional non-square output, e.g. 1920 × 1080. The product is framed to fit the shorter side. */
+  width?: number
+  height?: number
   transparent: boolean
   view: ViewName | null
 }

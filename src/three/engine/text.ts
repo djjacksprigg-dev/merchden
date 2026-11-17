@@ -40,8 +40,10 @@ export const DEFAULT_TEXT: TextStyle = {
   arc: 0,
 }
 
-function fontCss(f: FontDef, px: number) {
-  return `${f.weight} ${px}px ${f.family}`
+function fontCss(f: FontDef, px: number, style?: Pick<TextStyle, 'bold' | 'italic'>) {
+  // fonts without a bold/italic cut are synthesised by the browser
+  const weight = style?.bold ? Math.max(800, f.weight + 300) : f.weight
+  return `${style?.italic ? 'italic ' : ''}${weight} ${px}px ${f.family}`
 }
 
 /** Waits until the browser has the font ready (they load on first use). */
@@ -49,6 +51,7 @@ export async function ensureFont(fontId: string) {
   const f = FONT_MAP[fontId] ?? FONTS[0]
   try {
     await document.fonts.load(fontCss(f, 64), 'ABCabc0123')
+    await document.fonts.load(fontCss(f, 64, { bold: true }), 'ABCabc0123')
   } catch {
     /* fall back to whatever is available */
   }
@@ -64,7 +67,7 @@ export function renderTextCanvas(style: TextStyle): HTMLCanvasElement {
 
   const meas = document.createElement('canvas').getContext('2d')!
   const measureLine = (text: string, size: number) => {
-    meas.font = fontCss(f, size)
+    meas.font = fontCss(f, size, style)
     const sp = style.spacing * size
     let w = 0
     const widths: number[] = []
@@ -100,7 +103,7 @@ export function renderTextCanvas(style: TextStyle): HTMLCanvasElement {
     ctx.save()
     ctx.translate(x, y)
     ctx.rotate(rot)
-    ctx.font = fontCss(f, size)
+    ctx.font = fontCss(f, size, style)
     if (pass === 'stroke') {
       ctx.strokeStyle = style.outlineColor
       ctx.lineWidth = outline * 2 * (size / PX)
@@ -134,7 +137,10 @@ export function renderTextCanvas(style: TextStyle): HTMLCanvasElement {
         })
       } else {
         const y = li === 0 ? mainY : mainY + (arc < 0 ? sag : 0) + sizes[0] * 0.5 + lineGap + size * 0.6
-        let x = cx - m.width / 2
+        // lines of different widths line up left, centre or right
+        const blockW = Math.max(...metrics.map((mm) => mm.width))
+        const align = style.align ?? 'center'
+        let x = align === 'left' ? cx - blockW / 2 : align === 'right' ? cx + blockW / 2 - m.width : cx - m.width / 2
         chars.forEach((ch, i) => {
           drawGlyph(ch, x + m.widths[i] / 2, y, 0, size, pass)
           x += m.widths[i] + m.sp
@@ -182,7 +188,7 @@ function trim(c: HTMLCanvasElement): HTMLCanvasElement {
 
 const cache = new Map<string, HTMLCanvasElement>()
 const pending = new Map<string, Promise<HTMLCanvasElement>>()
-export const textKey = (s: TextStyle) => JSON.stringify([s.content, s.subline ?? '', s.font, s.color, s.outlineColor, s.outline, s.spacing, s.arc])
+export const textKey = (s: TextStyle) => JSON.stringify([s.content, s.subline ?? '', s.font, s.color, s.outlineColor, s.outline, s.spacing, s.arc, !!s.bold, !!s.italic, s.align ?? 'center'])
 
 export function getTextCanvas(s: TextStyle): HTMLCanvasElement | null {
   return cache.get(textKey(s)) ?? null

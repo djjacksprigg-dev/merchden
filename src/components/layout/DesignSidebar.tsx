@@ -6,6 +6,8 @@ import { PlacementPanel } from '../placement/PlacementPanel'
 import { ColourPanel } from '../colour/ColourPanel'
 import { BrandKitPanel } from '../project/BrandKitPanel'
 import { LayersPanel } from '../placement/LayersPanel'
+import { KitBuilder } from '../placement/KitBuilder'
+import { PRODUCT_MAP } from '../../three/catalogue'
 import { ExportPanel } from '../export/ExportPanel'
 
 const TABS: { id: RightTab; label: string; icon: typeof Palette }[] = [
@@ -19,6 +21,8 @@ const TABS: { id: RightTab; label: string; icon: typeof Palette }[] = [
 export function DesignSidebar() {
   const tab = useStudio((s) => s.rightTab)
   const setTab = useStudio((s) => s.setRightTab)
+  const category = useStudio((s) => PRODUCT_MAP[s.design.productId]?.category)
+  const isJersey = useStudio((s) => s.design.productId === 'jersey')
   return (
     <div className="flex h-full flex-col">
       <div className="grid grid-cols-5 gap-1 border-b border-white/6 p-2" role="tablist" aria-label="Design controls">
@@ -52,6 +56,12 @@ export function DesignSidebar() {
               <h2 className="panel-title mb-3">Logos &amp; images</h2>
               <LogoUploader />
             </section>
+            {category === 'clothing' && (
+              <section className={`section ${isJersey ? 'bg-accent-soft/40' : ''}`} aria-label="Team kit builder">
+                <h2 className="panel-title mb-3">{isJersey ? 'Jersey designer – team kit' : 'Team kit'}</h2>
+                <KitBuilder />
+              </section>
+            )}
             <section className="section" aria-label="Layers">
               <h2 className="panel-title mb-3">Layers</h2>
               <LayersPanel />

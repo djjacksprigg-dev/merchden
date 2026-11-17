@@ -24,6 +24,10 @@ export type PatternId =
   | 'glitch'
   | 'binary'
   | 'esports-camo'
+  | 'abstract'
+  | 'minimal'
+  | 'split'
+  | 'racing'
   | 'custom'
 
 export type ViewName = 'front' | 'back' | 'side' | 'right' | 'three-quarter'

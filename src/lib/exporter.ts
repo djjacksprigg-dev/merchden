@@ -11,6 +11,40 @@ import { captureScene, maxExportSize, rendererAvailable, stageKey, waitForStage 
 import { preloadLogos, preloadText } from '../components/viewer/useLogoImage'
 import { canvasToBlob, downloadBlob, exportFilename, nextFrame, safeName, VIEW_LABELS } from './utils'
 import { buildContactSheet, buildPresentationSheet, type SheetItem } from './sheets'
+import { composeExport } from '../components/viewer/ExportBridge'
+
+export type ExportFormat = 'png' | 'jpg'
+export interface ExportSpec {
+  /** output width × height in pixels */
+  w: number
+  h: number
+  format: ExportFormat
+}
+export const EXPORT_SIZES: { id: string; label: string; w: number; h: number }[] = [
+  { id: 'hd', label: '1920 × 1080 (HD)', w: 1920, h: 1080 },
+  { id: 'qhd', label: '2560 × 1440 (QHD)', w: 2560, h: 1440 },
+  { id: '4k', label: '3840 × 2160 (4K)', w: 3840, h: 2160 },
+  { id: 'sq2048', label: '2048 × 2048 (square)', w: 2048, h: 2048 },
+]
+
+/** Encodes a canvas as PNG or JPG. JPG has no transparency, so it gets a white backing. */
+export async function encode(canvas: HTMLCanvasElement, format: ExportFormat): Promise<Blob> {
+  if (format === 'png') return canvasToBlob(canvas)
+  const c = document.createElement('canvas')
+  c.width = canvas.width
+  c.height = canvas.height
+  const x = c.getContext('2d')!
+  x.fillStyle = '#ffffff'
+  x.fillRect(0, 0, c.width, c.height)
+  x.drawImage(canvas, 0, 0)
+  return canvasToBlob(c, 'image/jpeg', 0.92)
+}
+
+/** Views a product genuinely has (products with one distinctive side show it once). */
+export function viewsFor(productId: string): ViewName[] {
+  const def = PRODUCT_MAP[productId]
+  return def?.sideLabel ? ['front', 'back', 'side', 'three-quarter'] : ['front', 'back', 'side', 'right', 'three-quarter']
+}
 
 export const ALL_VIEWS: ViewName[] = ['front', 'back', 'side', 'three-quarter']
 
@@ -24,7 +58,9 @@ function productLabel(d: Design) {
 
 function viewLabel(d: Design, v: ViewName | null) {
   if (!v) return 'Custom'
-  if (v === 'side') return PRODUCT_MAP[d.productId]?.sideLabel ?? 'Left'
+  const def = PRODUCT_MAP[d.productId]
+  if (v === 'side') return (def?.sideLabel ?? def?.sideLabels?.[0] ?? 'Left').replace(/\s+/g, '')
+  if (v === 'right') return (def?.sideLabels?.[1] ?? 'Right').replace(/\s+/g, '')
   return VIEW_LABELS[v].replace(/\s+/g, '')
 }
 
@@ -62,34 +98,84 @@ async function ensureEditorReady() {
 /* Current design                                                      */
 /* ------------------------------------------------------------------ */
 
-export function downloadCurrent(opts: { transparent: boolean; view: ViewName | null; size: number }) {
-  return run(opts.transparent ? 'Rendering transparent PNG…' : 'Rendering PNG…', async () => {
+function fitSpec(spec: ExportSpec) {
+  // keep within what this graphics card can render (the shorter side is the product render)
+  const max = maxExportSize()
+  const k = Math.min(1, max / Math.min(spec.w, spec.h), 8192 / Math.max(spec.w, spec.h))
+  return { width: Math.round(spec.w * k), height: Math.round(spec.h * k) }
+}
+
+export function downloadCurrent(opts: { transparent: boolean; view: ViewName | null; size?: number; spec?: ExportSpec }) {
+  const spec: ExportSpec = opts.spec ?? { w: opts.size ?? 2048, h: opts.size ?? 2048, format: 'png' }
+  const transparent = opts.transparent && spec.format === 'png'
+  return run(transparent ? 'Rendering transparent PNG…' : `Rendering ${spec.format.toUpperCase()}…`, async () => {
     await ensureEditorReady()
     const d = useStudio.getState().design
-    const canvas = captureScene({ size: clampSize(opts.size), transparent: opts.transparent, view: opts.view })
-    const blob = await canvasToBlob(canvas)
-    const name = exportFilename(team(), productLabel(d), viewLabel(d, opts.view) + (opts.transparent ? '-Transparent' : ''))
+    const canvas = captureScene({ size: Math.min(spec.w, spec.h), ...fitSpec(spec), transparent, view: opts.view })
+    const blob = await encode(canvas, spec.format)
+    const name = exportFilename(team(), productLabel(d), viewLabel(d, opts.view) + (transparent ? '-Transparent' : ''), spec.format)
     downloadBlob(blob, name)
     useStudio.getState().toast(`Downloaded ${name} (${canvas.width} × ${canvas.height})`, 'success')
   })
 }
 
-export function downloadAllViews(opts: { transparent: boolean; size: number }) {
+export function downloadAllViews(opts: { transparent: boolean; size?: number; spec?: ExportSpec }) {
+  const spec: ExportSpec = opts.spec ?? { w: opts.size ?? 2048, h: opts.size ?? 2048, format: 'png' }
+  const transparent = opts.transparent && spec.format === 'png'
   return run('Rendering product views…', async (progress) => {
     await ensureEditorReady()
     const d = useStudio.getState().design
+    const views = viewsFor(d.productId)
     const files: Record<string, Uint8Array> = {}
-    for (let i = 0; i < ALL_VIEWS.length; i++) {
-      const v = ALL_VIEWS[i]
-      progress(i / ALL_VIEWS.length, `Rendering ${VIEW_LABELS[v].toLowerCase()} view…`)
+    for (let i = 0; i < views.length; i++) {
+      const v = views[i]
+      progress(i / views.length, `Rendering ${viewLabel(d, v).toLowerCase()} view…`)
       await nextFrame()
-      const c = captureScene({ size: clampSize(opts.size), transparent: opts.transparent, view: v })
-      files[exportFilename(team(), productLabel(d), viewLabel(d, v) + (opts.transparent ? '-Transparent' : ''))] = new Uint8Array(await (await canvasToBlob(c)).arrayBuffer())
+      const c = captureScene({ size: Math.min(spec.w, spec.h), ...fitSpec(spec), transparent, view: v })
+      files[exportFilename(team(), productLabel(d), viewLabel(d, v) + (transparent ? '-Transparent' : ''), spec.format)] = new Uint8Array(await (await encode(c, spec.format)).arrayBuffer())
     }
     const zip = zipSync(files, { level: 0 })
     const name = `${safeName(team(), 'MyTeam')}_${safeName(productLabel(d))}_Views.zip`
     downloadBlob(new Blob([zip], { type: 'application/zip' }), name)
-    useStudio.getState().toast(`Downloaded ${name} with ${ALL_VIEWS.length} views`, 'success')
+    useStudio.getState().toast(`Downloaded ${name} with ${views.length} views`, 'success')
+  })
+}
+
+/** Front and back side by side on one image (great for jerseys and kit reveals). */
+export function frontBackCanvas(spec: ExportSpec, transparent: boolean, label = true): HTMLCanvasElement {
+  const { width: W, height: H } = fitSpec(spec)
+  const st = useStudio.getState()
+  const m = Math.round(Math.min(H * 0.86, W * 0.48))
+  const front = captureScene({ size: m, transparent: true, view: 'front' })
+  const back = captureScene({ size: m, transparent: true, view: 'back' })
+  const blank = document.createElement('canvas')
+  blank.width = blank.height = Math.min(W, H)
+  const out = composeExport(blank, W, H, transparent ? 'transparent' : st.exportBackground)
+  const x = out.getContext('2d')!
+  const top = (H - m) / 2 - H * 0.02
+  x.drawImage(front, W / 2 - m - W * 0.005, top, m, m)
+  x.drawImage(back, W / 2 + W * 0.005, top, m, m)
+  if (label) {
+    const light = !transparent && (st.exportBackground === 'white' || (st.exportBackground === 'scene' && ['studio-light', 'minimal', 'white-studio', 'exhibition'].includes(st.scene)))
+    x.fillStyle = light ? 'rgba(15,20,30,0.7)' : 'rgba(255,255,255,0.8)'
+    x.font = `700 ${Math.round(H * 0.024)}px "Inter Variable", Inter, Arial, sans-serif`
+    x.textAlign = 'center'
+    x.textBaseline = 'middle'
+    x.fillText('FRONT', W / 2 - m / 2 - W * 0.005, top + m + H * 0.035)
+    x.fillText('BACK', W / 2 + m / 2 + W * 0.005, top + m + H * 0.035)
+  }
+  return out
+}
+
+export function downloadFrontBack(opts: { transparent: boolean; spec: ExportSpec }) {
+  const transparent = opts.transparent && opts.spec.format === 'png'
+  return run('Rendering front and back…', async () => {
+    await ensureEditorReady()
+    const d = useStudio.getState().design
+    const canvas = frontBackCanvas(opts.spec, transparent)
+    const name = exportFilename(team(), productLabel(d), 'FrontBack' + (transparent ? '-Transparent' : ''), opts.spec.format)
+    downloadBlob(await encode(canvas, opts.spec.format), name)
+    useStudio.getState().toast(`Downloaded ${name} (${canvas.width} × ${canvas.height})`, 'success')
   })
 }
 

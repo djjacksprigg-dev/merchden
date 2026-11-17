@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react'
-import { Download, FileImage, Images, Layers, Save, CopyPlus } from 'lucide-react'
+import { Download, FileImage, Images, Layers, Save, CopyPlus, Columns2 } from 'lucide-react'
 import { useStudio, type ExportBackground } from '../../state/studio'
-import { downloadAllViews, downloadCurrent, saveToCollection } from '../../lib/exporter'
+import { downloadAllViews, downloadCurrent, downloadFrontBack, EXPORT_SIZES, saveToCollection, viewsFor, type ExportFormat, type ExportSpec } from '../../lib/exporter'
+import { PRODUCT_MAP } from '../../three/catalogue'
 import { maxExportSize } from '../../three/renderService'
 import { SCENES, SCENE_MAP } from '../../three/scenes'
 import type { ViewName } from '../../lib/types'
 
-const SIZES = [1024, 2048, 4096]
 
 export function ExportPanel() {
-  const [size, setSize] = useState(2048)
+  const [sizeId, setSizeId] = useState('hd')
+  const [format, setFormat] = useState<ExportFormat>('png')
   const [max, setMax] = useState(4096)
+  const size = EXPORT_SIZES.find((x) => x.id === sizeId) ?? EXPORT_SIZES[0]
+  const spec: ExportSpec = { w: size.w, h: size.h, format }
+  const def = useStudio((s) => PRODUCT_MAP[s.design.productId])
   const bg = useStudio((s) => s.exportBackground)
   const setBg = useStudio((s) => s.setExportBackground)
   const scene = useStudio((s) => s.scene)
@@ -22,20 +26,31 @@ export function ExportPanel() {
     return () => clearTimeout(t)
   }, [])
 
-  const one = (view: ViewName | null, transparent = false) => downloadCurrent({ view, transparent, size })
+  const one = (view: ViewName | null, transparent = false) => downloadCurrent({ view, transparent, spec: transparent ? { ...spec, format: 'png' } : spec })
 
   return (
     <div className="space-y-5">
       <div>
         <p className="field-label">Image size</p>
-        <div className="flex gap-1.5" role="radiogroup" aria-label="Image size">
-          {SIZES.map((s) => (
-            <button key={s} type="button" role="radio" aria-checked={size === s} className="chip" disabled={s > max} onClick={() => setSize(s)} title={s > max ? 'Not supported by this graphics card' : undefined}>
-              {s} px
+        <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Image size">
+          {EXPORT_SIZES.map((x) => {
+            const tooBig = Math.min(x.w, x.h) > max
+            return (
+              <button key={x.id} type="button" role="radio" aria-checked={sizeId === x.id} className="chip justify-center" onClick={() => setSizeId(x.id)} title={tooBig ? `This computer renders up to ${max} px – the image is scaled to fit` : undefined}>
+                {x.label}
+              </button>
+            )
+          })}
+        </div>
+        <p className="field-label mt-3">Format</p>
+        <div className="flex gap-1.5" role="radiogroup" aria-label="File format">
+          {(['png', 'jpg'] as ExportFormat[]).map((f) => (
+            <button key={f} type="button" role="radio" aria-checked={format === f} className="chip" onClick={() => setFormat(f)}>
+              {f.toUpperCase()}
             </button>
           ))}
         </div>
-        {max < 4096 && <p className="mt-1.5 text-[11px] text-slate-500">This computer's graphics card supports up to {max} px.</p>}
+        <p className="mt-1.5 text-[11px] text-slate-500">PNG keeps full quality and supports transparency. JPG files are smaller (white is used where the background would be transparent). Images are never stretched – the product is framed to fit and the background fills the frame.</p>
       </div>
       <div>
         <p className="field-label">Look</p>
@@ -75,34 +90,32 @@ export function ExportPanel() {
             </button>
           ))}
         </div>
-        {bg === 'brand' && <p className="mt-1.5 text-[11px] text-slate-500">Uses your team colours, a large faded logo and your logo + organisation name in the corner (set the name in Project).</p>}
+        {bg === 'brand' && <p className="mt-1.5 text-[11px] text-slate-500">Uses your team colours, a large faded logo and your logo + organisation name in the corner (set the name in Brand Kit).</p>}
       </div>
 
       <div className="space-y-2">
         <button type="button" className="btn-primary w-full justify-start" onClick={() => one(null)} disabled={busy}>
-          <Download className="h-4 w-4" aria-hidden /> Download PNG (current view, chosen background)
+          <Download className="h-4 w-4" aria-hidden /> Download {format.toUpperCase()} (current view)
+        </button>
+        <button type="button" className="btn-secondary w-full justify-start" onClick={() => downloadFrontBack({ transparent: false, spec })} disabled={busy}>
+          <Columns2 className="h-4 w-4" aria-hidden /> Front + back together ({format.toUpperCase()})
         </button>
         <button type="button" className="btn-secondary w-full justify-start" onClick={() => one(null, true)} disabled={busy}>
           <FileImage className="h-4 w-4" aria-hidden /> Download transparent PNG
         </button>
-        <button type="button" className="btn-secondary w-full justify-start" onClick={() => downloadAllViews({ transparent: false, size })} disabled={busy}>
-          <Images className="h-4 w-4" aria-hidden /> Download all 4 product views (ZIP)
+        <button type="button" className="btn-secondary w-full justify-start" onClick={() => downloadAllViews({ transparent: false, spec })} disabled={busy}>
+          <Images className="h-4 w-4" aria-hidden /> Download all {viewsFor(def.id).length} views (ZIP)
         </button>
       </div>
 
       <div>
         <p className="field-label">Single views</p>
         <div className="grid grid-cols-2 gap-1.5">
-          {(
-            [
-              ['front', 'Front'],
-              ['back', 'Back'],
-              ['side', 'Side'],
-              ['three-quarter', 'Three-quarter'],
-            ] as [ViewName, string][]
-          ).map(([v, label]) => (
+          {viewsFor(def.id)
+            .map((v): [ViewName, string] => [v, v === 'front' ? 'Front' : v === 'back' ? 'Back' : v === 'three-quarter' ? 'Three-quarter' : v === 'side' ? (def.sideLabel ?? def.sideLabels?.[0] ?? 'Left') : (def.sideLabels?.[1] ?? 'Right')])
+            .map(([v, label]) => (
             <div key={v} className="flex overflow-hidden rounded-lg border border-white/10">
-              <button type="button" className="flex-1 bg-navy-800 px-2 py-1.5 text-xs font-medium text-slate-200 hover:bg-navy-700" onClick={() => one(v)} disabled={busy} aria-label={`Download ${label} view PNG`}>
+              <button type="button" className="flex-1 bg-navy-800 px-2 py-1.5 text-xs font-medium text-slate-200 hover:bg-navy-700" onClick={() => one(v)} disabled={busy} aria-label={`Download ${label} view ${format.toUpperCase()}`}>
                 {label}
               </button>
               <button
@@ -126,7 +139,7 @@ export function ExportPanel() {
       <div className="space-y-2 border-t border-white/6 pt-4">
         <p className="panel-title">Merchandise collection</p>
         <button type="button" className="btn-secondary w-full justify-start" onClick={() => saveToCollection(false)} disabled={busy}>
-          <Save className="h-4 w-4" aria-hidden /> {isSaved ? 'Update in My designs' : 'Save to My designs'}
+          <Save className="h-4 w-4" aria-hidden /> {isSaved ? 'Update in My collection' : 'Add to My collection'}
         </button>
         {isSaved && (
           <button type="button" className="btn-ghost w-full justify-start" onClick={() => saveToCollection(true)} disabled={busy}>
@@ -134,7 +147,7 @@ export function ExportPanel() {
           </button>
         )}
         <button type="button" className="btn-ghost w-full justify-start" onClick={() => useStudio.getState().setCollectionOpen(true)}>
-          Open My designs for ZIP and presentation sheet downloads →
+          Open My collection for ZIP and collection board downloads →
         </button>
       </div>
     </div>

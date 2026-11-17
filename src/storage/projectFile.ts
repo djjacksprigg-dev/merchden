@@ -154,7 +154,16 @@ function cleanDesign(v: unknown, images: Set<string>): Design | null {
   if (!isObj(v) || !own(PRODUCT_MAP, v.productId)) return null
   const def = PRODUCT_MAP[v.productId]
   const colors: Record<string, string> = { ...def.defaults }
-  if (isObj(v.colors)) for (const [k, c] of Object.entries(v.colors)) if (/^[a-z0-9-]{1,20}$/.test(k) && typeof c === 'string' && HEX.test(c)) colors[k] = c.toLowerCase()
+  const given = new Set<string>()
+  if (isObj(v.colors))
+    for (const [k, c] of Object.entries(v.colors))
+      if (/^[a-z0-9-]{1,20}$/.test(k) && typeof c === 'string' && HEX.test(c)) {
+        colors[k] = c.toLowerCase()
+        given.add(k)
+      }
+  // older files: new sleeve / collar slots follow the colours they used to share
+  if ('sleeve' in def.defaults && !given.has('sleeve') && given.has('primary')) colors.sleeve = colors.primary
+  if ('collar' in def.defaults && !given.has('collar') && given.has('trim')) colors.collar = colors.trim
   const layers = Array.isArray(v.layers) ? (v.layers.slice(0, 40).map((l) => cleanLayer(l, images)).filter(Boolean) as LogoLayer[]) : []
   const customPatternId = id(v.customPatternId)
   return {

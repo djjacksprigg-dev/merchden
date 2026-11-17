@@ -144,4 +144,6 @@ export interface ProductDef {
   maxPolar?: number
   /** How the side view is labelled in the UI */
   sideLabel?: string
+  /** Labels for the left / right views when a product has both (e.g. jersey sleeves) */
+  sideLabels?: [string, string]
 }

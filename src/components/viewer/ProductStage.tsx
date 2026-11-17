@@ -239,7 +239,11 @@ export function ProductStage({ onFloor }: { onFloor: (y: number, radius: number)
 /* ------------------------------------------------------------------ */
 
 function slotColor(part: Part, design: Design, def: ProductDef) {
-  if (part.slot) return design.colors[part.slot] ?? def.defaults[part.slot] ?? '#888888'
+  if (part.slot) {
+    // designs made before a garment gained separate sleeve/collar colours
+    const legacy = part.slot === 'sleeve' ? design.colors.primary : part.slot === 'collar' ? design.colors.trim : undefined
+    return design.colors[part.slot] ?? legacy ?? def.defaults[part.slot] ?? '#888888'
+  }
   return part.color ?? '#888888'
 }
 

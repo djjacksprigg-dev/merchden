@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { Plus, Type } from 'lucide-react'
+import { AlignCenter, AlignLeft, AlignRight, Bold, Italic, Plus, Type } from 'lucide-react'
 import { selectDef, useStudio } from '../../state/studio'
 import { ColorField, Slider } from '../ui/controls'
 import { FONTS, FONT_MAP } from '../../three/engine/text'
@@ -64,7 +64,7 @@ export function TextPanel() {
         const z = pickZone(zones, /^back$|rear|reverse|back/, def.defaultZone, occupied)
         if (!z) return
         addTextLayer(z.id, { content: 'GAMERTAG', font: 'russo' }, { offsetY: 0.75, scale: 0.85 })
-        addTextLayer(z.id, { content: '07', font: 'russo', outline: 0.06, outlineColor: '#2f8cff' }, { offsetY: 0.05, scale: 0.75 })
+        addTextLayer(z.id, { content: '07', font: 'russo', outline: 0.06, outlineColor: '#ff7a1a' }, { offsetY: 0.05, scale: 0.75 })
       },
     },
     {
@@ -137,7 +137,7 @@ export function TextPanel() {
           onRemove={() => removeLayer(layer.id)}
         />
       )}
-      <p className="text-[11px] text-slate-500">Text is printed onto the product surface like your logo – drag it with the position pad, or double-click the product.</p>
+      <p className="text-[11px] text-slate-500">Text is printed onto the product surface like your logo – drag it on the product, use the position pad, or double-click the product.</p>
     </div>
   )
 }
@@ -178,6 +178,28 @@ function TextEditor({ layer, onText }: { layer: LogoLayer; onText: (p: Partial<N
               aria-label={f.label}
             >
               {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button type="button" className="chip px-2" aria-pressed={!!t.bold} onClick={() => onText({ bold: !t.bold })} aria-label="Bold" title="Bold">
+          <Bold className="h-3.5 w-3.5" aria-hidden />
+        </button>
+        <button type="button" className="chip px-2" aria-pressed={!!t.italic} onClick={() => onText({ italic: !t.italic })} aria-label="Italic" title="Italic">
+          <Italic className="h-3.5 w-3.5" aria-hidden />
+        </button>
+        <span className="mx-1 h-5 w-px bg-white/10" aria-hidden />
+        <div className="flex gap-1.5" role="radiogroup" aria-label="Line alignment">
+          {(
+            [
+              ['left', AlignLeft, 'Align lines left'],
+              ['center', AlignCenter, 'Centre lines'],
+              ['right', AlignRight, 'Align lines right'],
+            ] as const
+          ).map(([a, Icon, label]) => (
+            <button key={a} type="button" role="radio" className="chip px-2" aria-checked={(t.align ?? 'center') === a} onClick={() => onText({ align: a })} aria-label={label} title={label}>
+              <Icon className="h-3.5 w-3.5" aria-hidden />
             </button>
           ))}
         </div>

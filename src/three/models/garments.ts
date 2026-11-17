@@ -413,7 +413,7 @@ function buildTop(kind: AnyKind): ProductModel {
     key: 'sleeves',
     geometry: mirrored(sleeve.geometry),
     finish: kind === 'varsity' ? 'leather' : fabric,
-    slot: kind === 'varsity' ? 'sleeve' : kind === 'windbreaker' ? 'secondary' : 'primary',
+    slot: kind === 'varsity' || kind === 'jersey' ? 'sleeve' : kind === 'windbreaker' ? 'secondary' : 'primary',
     doubleSide: true,
     pattern: kind === 'varsity' || kind === 'windbreaker' ? undefined : 'sleeve',
   })
@@ -442,7 +442,7 @@ function buildTop(kind: AnyKind): ProductModel {
 
   // Necklines
   if (kind === 'jersey') {
-    parts.push({ key: 'collar', geometry: edgeTube(body, 0.004, [0.016, 0.022]), finish: 'rib', slot: 'trim' })
+    parts.push({ key: 'collar', geometry: edgeTube(body, 0.004, [0.016, 0.022]), finish: 'rib', slot: 'collar' })
     // side piping
     const piping = [0.235, 0.765].map((u) =>
       surfacePatch(body, { u0: u - 0.006, u1: u + 0.006, v0: vy(-0.77), v1: vy(0.44), off: 0.004, segU: 2, segV: 40 }),

@@ -29,6 +29,9 @@ export const PATTERNS: { id: PatternId; label: string; group: PatternGroup }[] =
   { id: 'halftone', label: 'Halftone', group: 'classic' },
   { id: 'camo', label: 'Camo', group: 'classic' },
   { id: 'carbon', label: 'Carbon fibre', group: 'classic' },
+  { id: 'split', label: 'Split colour', group: 'classic' },
+  { id: 'racing', label: 'Racing stripes', group: 'classic' },
+  { id: 'minimal', label: 'Minimalist', group: 'classic' },
   { id: 'logo-repeat', label: 'Team logo monogram', group: 'esports' },
   { id: 'crosshair', label: 'Crosshairs', group: 'esports' },
   { id: 'controller', label: 'Controllers', group: 'esports' },
@@ -40,6 +43,7 @@ export const PATTERNS: { id: PatternId; label: string; group: PatternGroup }[] =
   { id: 'glitch', label: 'Glitch', group: 'esports' },
   { id: 'binary', label: 'Binary code', group: 'esports' },
   { id: 'esports-camo', label: 'Gamer camo', group: 'esports' },
+  { id: 'abstract', label: 'Abstract esports', group: 'esports' },
 ]
 
 /* ------------------------------------------------------------------ */
@@ -359,6 +363,93 @@ export function drawPattern(
         ctx.fillStyle = Math.round((x - w / 2) / step) % 4 === 0 ? c.b : c.a
         ctx.fillRect(x - lw / 2, 0, lw, h)
       }
+      break
+    }
+
+    case 'split': {
+      // half and half – on garments the split runs down centre front and back
+      ctx.fillStyle = c.a
+      if (mode === 'body') ctx.fillRect(w * 0.5, 0, w * 0.5, h)
+      else if (mode === 'wrap') ctx.fillRect(w * 0.5, 0, w * 0.5, h)
+      else if (mode === 'flat') ctx.fillRect(w * 0.5, 0, w * 0.5, h)
+      if (mode !== 'sleeve') {
+        ctx.fillStyle = c.b
+        const lw = Math.max(2, 0.008 * U)
+        ctx.fillRect(w * 0.5 - lw / 2, 0, lw, h)
+        if (mode === 'body') {
+          ctx.fillRect(0, 0, lw / 2, h)
+          ctx.fillRect(w - lw / 2, 0, lw / 2, h)
+        }
+      }
+      break
+    }
+
+    case 'racing': {
+      // twin stripes: centre front and centre back on garments, along the length on sleeves
+      const sw = 0.055 * U
+      const gap = 0.03 * U
+      const stripes = (cx: number, len: 'v' | 'h') => {
+        for (const [off, col] of [
+          [-(gap / 2 + sw), c.a],
+          [gap / 2, c.a],
+        ] as [number, string][]) {
+          ctx.fillStyle = col
+          if (len === 'v') ctx.fillRect(cx + off, 0, sw, h)
+          else ctx.fillRect(0, cx + off, w, sw)
+        }
+        ctx.fillStyle = c.b
+        const lw = Math.max(1.5, 0.006 * U)
+        for (const off of [-(gap / 2 + sw) - lw, -gap / 2, gap / 2 - lw, gap / 2 + sw]) {
+          if (len === 'v') ctx.fillRect(cx + off, 0, lw, h)
+          else ctx.fillRect(0, cx + off, w, lw)
+        }
+      }
+      if (mode === 'body') {
+        stripes(w * 0.5, 'v')
+        stripes(0, 'v')
+        stripes(w, 'v')
+      } else if (mode === 'sleeve') stripes(w * 0.5, 'v')
+      else stripes(w * 0.5, 'v')
+      break
+    }
+
+    case 'minimal': {
+      // one fine chest band with a short accent tick
+      const lw = Math.max(2, 0.012 * U)
+      const y = mode === 'body' ? h * 0.3 : mode === 'sleeve' ? h * 0.12 : h * 0.3
+      ctx.fillStyle = c.a
+      ctx.fillRect(0, y, w, lw)
+      ctx.fillStyle = c.b
+      if (mode === 'body') ctx.fillRect(w * 0.6, y + lw * 2, 0.08 * U, lw)
+      else ctx.fillRect(w * 0.55, y + lw * 2, 0.06 * U, lw)
+      break
+    }
+
+    case 'abstract': {
+      // sharp angular shards sweeping across – a classic sublimated esports look
+      const r = rand(4242)
+      ctx.save()
+      ctx.translate(w / 2, h / 2)
+      ctx.rotate(-0.5)
+      const R = Math.hypot(w, h) / 2
+      const n = Math.ceil((R * 2) / (0.22 * U)) + 2
+      for (let i = 0; i < n; i++) {
+        const y0 = -R + i * 0.22 * U + (r() - 0.5) * 0.1 * U
+        const len = (0.4 + r() * 0.9) * U
+        const x0 = -R + r() * R * 2
+        const th = (0.03 + r() * 0.07) * U
+        ctx.fillStyle = r() > 0.72 ? c.b : c.a
+        ctx.globalAlpha = 0.55 + r() * 0.45
+        ctx.beginPath()
+        ctx.moveTo(x0, y0)
+        ctx.lineTo(x0 + len, y0 - th * 0.4)
+        ctx.lineTo(x0 + len - th * 1.6, y0 + th)
+        ctx.lineTo(x0 - th * 0.8, y0 + th * 1.2)
+        ctx.closePath()
+        ctx.fill()
+      }
+      ctx.globalAlpha = 1
+      ctx.restore()
       break
     }
 
