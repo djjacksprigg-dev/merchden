@@ -191,6 +191,7 @@ export const useStudio = create<StudioState>()((set, get) => {
     if (slots.has('secondary') && d.productId !== 'mug') colors.secondary = kit.secondary
     if (slots.has('accent')) colors.accent = kit.accent
     if (slots.has('trim')) colors.trim = kit.accent
+    if (slots.has('sleeve')) colors.sleeve = kit.accent
     const pc = def.patternColors
     if (!pc) {
       colors.pattern = kit.secondary

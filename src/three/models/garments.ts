@@ -48,6 +48,12 @@ function stops(list: [number, number, number][]) {
 }
 
 export type TopKind = 'jersey' | 'tee' | 'hoodie' | 'zip-hoodie' | 'sweatshirt' | 'polo' | 'jacket'
+/** Garments built on another garment's cloth simulation (same pattern pieces, different trims). */
+export type DerivedKind = 'oversized' | 'varsity' | 'windbreaker'
+type AnyKind = TopKind | DerivedKind
+const DRAPE_SOURCE: Record<DerivedKind, TopKind> = { oversized: 'tee', varsity: 'jacket', windbreaker: 'jacket' }
+const drapeKind = (k: AnyKind): TopKind => (k in DRAPE_SOURCE ? DRAPE_SOURCE[k as DerivedKind] : (k as TopKind))
+const isLoose = (k: AnyKind) => ['hoodie', 'zip-hoodie', 'sweatshirt', 'jacket', 'varsity', 'windbreaker'].includes(k)
 
 export function torsoRings(loose: boolean): Ring[] {
   const W = loose ? 0.5 : 0.46
@@ -268,9 +274,51 @@ const z = {
     maxSize: 0.72,
     depth: 0.2,
   }),
+  fullFront: (y = 0.02): PlanarZone => ({
+    id: 'full-front',
+    label: 'Full front',
+    kind: 'planar',
+    target: 'body',
+    origin: [0, y, 0.3],
+    normal: [0, 0, 1],
+    up: [0, 1, 0],
+    rangeX: 0.1,
+    rangeY: 0.18,
+    size: 0.66,
+    maxSize: 0.8,
+    depth: 0.22,
+  }),
+  upperBack: (y = 0.42): PlanarZone => ({
+    id: 'upper-back',
+    label: 'Upper back',
+    kind: 'planar',
+    target: 'body',
+    origin: [0, y, -0.3],
+    normal: [0, 0, -1],
+    up: [0, 1, 0],
+    rangeX: 0.18,
+    rangeY: 0.04,
+    size: 0.42,
+    maxSize: 0.62,
+    depth: 0.16,
+  }),
+  sidePanel: (side: 'left' | 'right'): PlanarZone => ({
+    id: `${side}-side`,
+    label: side === 'left' ? 'Left side panel' : 'Right side panel',
+    kind: 'planar',
+    target: 'body',
+    origin: [side === 'left' ? 0.47 : -0.47, -0.3, 0],
+    normal: [side === 'left' ? 1 : -1, 0, 0],
+    up: [0, 1, 0],
+    rangeX: 0.03,
+    rangeY: 0.25,
+    size: 0.13,
+    maxSize: 0.18,
+    depth: 0.1,
+  }),
   back: (y = 0.2): PlanarZone => ({
     id: 'back',
-    label: 'Back',
+    label: 'Full back',
     kind: 'planar',
     target: 'body',
     origin: [0, y, -0.3],
@@ -321,20 +369,32 @@ const z = {
 /* Tops                                                                */
 /* ------------------------------------------------------------------ */
 
-function buildTop(kind: TopKind): ProductModel {
-  const loose = kind === 'hoodie' || kind === 'zip-hoodie' || kind === 'sweatshirt' || kind === 'jacket'
+function buildTop(kind: AnyKind): ProductModel {
+  const loose = isLoose(kind)
   const long = loose
   const fabric: Finish =
-    kind === 'jersey' ? 'knit' : kind === 'polo' ? 'pique' : kind === 'jacket' ? 'tricot' : kind === 'tee' ? 'cotton' : 'fleece'
+    kind === 'jersey'
+      ? 'knit'
+      : kind === 'polo'
+        ? 'pique'
+        : kind === 'jacket'
+          ? 'tricot'
+          : kind === 'tee' || kind === 'oversized'
+            ? 'cotton'
+            : kind === 'windbreaker'
+              ? 'nylon'
+              : 'fleece'
+  const zipped = kind === 'zip-hoodie' || kind === 'jacket' || kind === 'windbreaker'
+  const hooded = kind === 'hoodie' || kind === 'zip-hoodie' || kind === 'windbreaker'
 
   const rings = torsoRings(loose)
   const vy = (y: number) => vAtY(rings, y)
   // Cloth-simulated drape when baked data exists (scripts/bake-cloth.ts), else the procedural shape
-  const baked = BAKED[kind]
+  const baked = BAKED[drapeKind(kind)]
   let body: Surface
   let sleeve: Pick<Surface, 'point' | 'geometry' | 'normal'>
   if (baked) {
-    const baseBody = simBody(kind)
+    const baseBody = simBody(drapeKind(kind))
     const baseSleeve = sleeveTube(long, loose, true)
     const bp = decodeOffsets(baked.body, Float32Array.from(baseBody.geometry.getAttribute('position').array as ArrayLike<number>))
     const sp = decodeOffsets(baked.sleeve, Float32Array.from(baseSleeve.geometry.getAttribute('position').array as ArrayLike<number>))
@@ -343,17 +403,24 @@ function buildTop(kind: TopKind): ProductModel {
     body = drapedSurface(bp, SIM_RES.bodyU, SIM_RES.bodyV, true)
     sleeve = drapedSurface(sp, SIM_RES.sleeveA, long ? SIM_RES.sleeveLong : SIM_RES.sleeveShort, true)
   } else {
-    body = createBody(rings, { deform: neckDeform(kind), folds: bodyFolds(loose), segU: 168, segV: 110 })
+    body = createBody(rings, { deform: neckDeform(drapeKind(kind)), folds: bodyFolds(loose), segU: 168, segV: 110 })
     sleeve = sleeveTube(long, loose)
   }
   const parts: Part[] = []
   const zones: Zone[] = []
   parts.push({ key: 'body', geometry: body.geometry, finish: fabric, slot: 'primary', doubleSide: true, pattern: 'body' })
-  parts.push({ key: 'sleeves', geometry: mirrored(sleeve.geometry), finish: fabric, slot: 'primary', doubleSide: true, pattern: 'sleeve' })
+  parts.push({
+    key: 'sleeves',
+    geometry: mirrored(sleeve.geometry),
+    finish: kind === 'varsity' ? 'leather' : fabric,
+    slot: kind === 'varsity' ? 'sleeve' : kind === 'windbreaker' ? 'secondary' : 'primary',
+    doubleSide: true,
+    pattern: kind === 'varsity' || kind === 'windbreaker' ? undefined : 'sleeve',
+  })
 
   // Cuffs / sleeve hems
   if (long) {
-    const cuffSlot = kind === 'jacket' ? 'trim' : 'secondary'
+    const cuffSlot = kind === 'jacket' || kind === 'varsity' || kind === 'windbreaker' ? 'trim' : 'secondary'
     parts.push({ key: 'cuffs', geometry: mirrored(cuffTube(loose).geometry), finish: 'rib', slot: cuffSlot, doubleSide: true })
     parts.push({
       key: 'waistband',
@@ -381,7 +448,7 @@ function buildTop(kind: TopKind): ProductModel {
       surfacePatch(body, { u0: u - 0.006, u1: u + 0.006, v0: vy(-0.77), v1: vy(0.44), off: 0.004, segU: 2, segV: 40 }),
     )
     parts.push({ key: 'piping', geometry: merge(piping), finish: 'knit', slot: 'trim' })
-  } else if (kind === 'tee' || kind === 'sweatshirt') {
+  } else if (kind === 'tee' || kind === 'oversized' || kind === 'sweatshirt') {
     parts.push({
       key: 'collar',
       geometry: merge([
@@ -416,7 +483,7 @@ function buildTop(kind: TopKind): ProductModel {
     })
     const buttons = [vy(0.47), vy(0.52), vy(0.57)].map((v) => orientedCylinder(body.point(0.5, v, 0.011), body.normal(0.5, v), 0.011, 0.006))
     parts.push({ key: 'buttons', geometry: merge(buttons), finish: 'gloss', slot: 'accent' })
-  } else if (kind === 'jacket') {
+  } else if (kind === 'jacket' || kind === 'varsity') {
     // stand-up collar with a gap at the zip
     const collar = gridGeometry(
       (a, b) => {
@@ -434,7 +501,7 @@ function buildTop(kind: TopKind): ProductModel {
   }
 
   // Hoods
-  if (kind === 'hoodie' || kind === 'zip-hoodie') {
+  if (hooded) {
     const hood = new SphereGeometry(1, 56, 32, Math.PI / 2 + 0.5, TAU - 1.0, 0, Math.PI * 0.64)
     transform(hood, { scale: [0.235, 0.29, 0.27] })
     hood.rotateX(-0.42)
@@ -451,8 +518,8 @@ function buildTop(kind: TopKind): ProductModel {
       p.setX(i, p.getX(i) + 0.006 * Math.sin(y * 40 + zz * 20))
     }
     hood.computeVertexNormals()
-    parts.push({ key: 'hood', geometry: hood, finish: 'fleece', slot: 'primary', pattern: 'wrap', patternFront: 0 })
-    parts.push({ key: 'hood-lining', geometry: hood.clone(), finish: 'cotton', slot: 'accent', backSide: true })
+    parts.push({ key: 'hood', geometry: hood, finish: kind === 'windbreaker' ? 'nylon' : 'fleece', slot: kind === 'windbreaker' ? 'secondary' : 'primary', pattern: kind === 'windbreaker' ? undefined : 'wrap', patternFront: 0 })
+    parts.push({ key: 'hood-lining', geometry: hood.clone(), finish: kind === 'windbreaker' ? 'nylon' : 'cotton', slot: kind === 'windbreaker' ? 'secondary' : 'accent', backSide: true })
     // drawcords
     const cords = [0.468, 0.532].map((u) => {
       const s = u < 0.5 ? -1 : 1
@@ -466,8 +533,8 @@ function buildTop(kind: TopKind): ProductModel {
       const p0 = body.point(u, 0.6, 0.034)
       return createTube([p0.clone().add(V(0, 0.01, 0)), p0.clone().add(V(0, -0.045, 0.002))], 0.0105, { radial: 10, segments: 2, capEnd: true, capStart: true }).geometry
     })
-    parts.push({ key: 'drawcords', geometry: merge(cords), finish: 'cotton', slot: 'accent' })
-    parts.push({ key: 'aglets', geometry: merge(aglets), finish: 'metal', color: '#c0c4cc' })
+    parts.push({ key: 'drawcords', geometry: merge(cords), finish: 'cotton', slot: kind === 'windbreaker' ? 'trim' : 'accent' })
+    parts.push({ key: 'aglets', geometry: merge(aglets), finish: kind === 'windbreaker' ? 'plastic' : 'metal', color: kind === 'windbreaker' ? '#16181d' : '#c0c4cc' })
   }
 
   // Pockets
@@ -513,11 +580,11 @@ function buildTop(kind: TopKind): ProductModel {
   }
 
   // Zips
-  if (kind === 'zip-hoodie' || kind === 'jacket') {
+  if (zipped) {
     const v1 = 1
     const zip = surfacePatch(body, { u0: 0.4978, u1: 0.5022, v0: vy(-0.7), v1, off: 0.01, segU: 2, segV: 60 })
     const parts2 = [zip]
-    if (kind === 'jacket') {
+    if (kind === 'jacket' || kind === 'windbreaker') {
       parts2.push(
         gridGeometry(
           (a, b) => {
@@ -533,7 +600,7 @@ function buildTop(kind: TopKind): ProductModel {
     // zip tape seams either side of the coil
     const tape = [0.4955, 0.5045].map((u) => seamLine(body, (t) => [u, lerp(vy(-0.7), 0.995, t)], 0.0095, 0.0016, 80))
     parts.push({ key: 'zip-tape', geometry: merge(tape), finish: 'cotton', slot: 'primary', shade: 0.85 })
-    const pullV = kind === 'jacket' ? 0.97 : 0.93
+    const pullV = kind === 'jacket' || kind === 'windbreaker' ? 0.97 : 0.93
     const pull = createTube([body.point(0.5, pullV, 0.018), body.point(0.5, pullV - 0.07, 0.022)], () => [0.006, 0.014], {
       radial: 8,
       segments: 2,
@@ -541,6 +608,50 @@ function buildTop(kind: TopKind): ProductModel {
       capEnd: true,
     }).geometry
     parts.push({ key: 'zip-pull', geometry: pull, finish: 'chrome', color: '#d4d7dd' })
+  }
+
+  // Varsity: snap placket and striped rib trims
+  if (kind === 'varsity') {
+    parts.push({
+      key: 'placket',
+      geometry: surfacePatch(body, { u0: 0.494, u1: 0.506, v0: vy(-0.7), v1: 1, off: 0.007, segU: 2, segV: 50 }),
+      finish: 'fleece',
+      slot: 'primary',
+      shade: 0.9,
+    })
+    const snaps = [-0.6, -0.36, -0.12, 0.12, 0.36].map((y) => orientedCylinder(body.point(0.5, vy(y), 0.012), body.normal(0.5, vy(y)), 0.016, 0.008))
+    parts.push({ key: 'snaps', geometry: merge(snaps), finish: 'chrome', color: '#d8dbe1' })
+    const ribStripe = (v0: number, v1: number) => surfacePatch(body, { u0: 0, u1: 1, v0, v1, off: 0.0075, segU: 168, segV: 2 })
+    const wb0 = vy(-0.76)
+    const wb1 = vy(-0.7)
+    const cuff = cuffTube(loose)
+    const cuffStripe = (t0: number, t1: number) => mirrored(surfacePatch(cuff, { u0: 0, u1: 1, v0: t0, v1: t1, off: 0.002, segU: 32, segV: 2 }))
+    // raglan shoulders in the sleeve material, running up to the collar
+    const vU = vy(0.34)
+    const w = (v: number) => 0.25 - 0.18 * Math.pow(clamp((v - vU) / (1 - vU), 0, 1), 0.5)
+    const raglan = [
+      surfacePatch(body, { u0: (v) => w(v), u1: (v) => 0.5 - w(v), v0: vU, v1: 1, off: 0.006, segU: 40, segV: 30 }),
+      surfacePatch(body, { u0: (v) => 0.5 + w(v), u1: (v) => 1 - w(v), v0: vU, v1: 1, off: 0.006, segU: 40, segV: 30 }),
+    ]
+    parts.push({ key: 'raglan', geometry: merge(raglan), finish: 'leather', slot: 'sleeve', doubleSide: true })
+    parts.push({
+      key: 'rib-stripes',
+      geometry: merge([ribStripe(lerp(wb0, wb1, 0.35), lerp(wb0, wb1, 0.45)), ribStripe(lerp(wb0, wb1, 0.6), lerp(wb0, wb1, 0.7)), cuffStripe(0.35, 0.47), cuffStripe(0.6, 0.72)]),
+      finish: 'rib',
+      slot: 'accent',
+      doubleSide: true,
+    })
+  }
+
+  // Windbreaker: colour-blocked chest and shoulder yoke (sleeves and hood share its colour)
+  if (kind === 'windbreaker') {
+    parts.push({
+      key: 'yoke',
+      geometry: surfacePatch(body, { u0: 0, u1: 1, v0: vy(0.3), v1: 0.995, off: 0.005, segU: 168, segV: 24 }),
+      finish: 'nylon',
+      slot: 'secondary',
+      doubleSide: true,
+    })
   }
 
   // Tracksuit sleeve stripes
@@ -571,7 +682,7 @@ function buildTop(kind: TopKind): ProductModel {
   }
   const edgeFinish: Finish = fabric === 'tricot' ? 'tricot' : 'cotton'
   parts.push({ key: 'construction', geometry: merge(mainEdges), finish: edgeFinish, slot: 'primary', shade: 0.92 })
-  const trimSlot = long ? (kind === 'jacket' ? 'trim' : 'secondary') : kind === 'jersey' ? 'trim' : 'secondary'
+  const trimSlot = long ? (kind === 'jacket' || kind === 'varsity' || kind === 'windbreaker' ? 'trim' : 'secondary') : kind === 'jersey' ? 'trim' : 'secondary'
   parts.push({ key: 'construction-trim', geometry: merge(trimEdges), finish: long ? 'rib' : edgeFinish, slot: trimSlot, shade: 0.92 })
 
   // Zones
@@ -579,30 +690,79 @@ function buildTop(kind: TopKind): ProductModel {
     case 'jersey':
       zones.push(
         { ...z.leftChest(0.24), id: 'front-chest', label: 'Front chest' },
+        z.rightChest(0.24),
         z.centre('centre-front', 'Centre front', 0.02, 0.4, 0.3),
+        z.fullFront(),
+        z.upperBack(0.42),
         z.back(0.22),
+        z.sleeve('left', false, false),
+        z.sleeve('right', false, false),
+        z.sidePanel('left'),
+        z.sidePanel('right'),
+      )
+      break
+    case 'tee':
+    case 'oversized':
+      zones.push(
+        z.centre('centre-front', 'Centre front', 0.12, 0.42),
+        z.fullFront(),
+        z.leftChest(),
+        z.rightChest(),
+        z.upperBack(0.42),
+        z.back(),
         z.sleeve('left', false, false),
         z.sleeve('right', false, false),
       )
       break
-    case 'tee':
-      zones.push(z.centre('centre-front', 'Centre front', 0.12, 0.42), z.leftChest(), z.back(), z.sleeve('left', false, false), z.sleeve('right', false, false))
+    case 'varsity':
+      zones.push(z.leftChest(0.28), z.rightChest(0.28), z.upperBack(0.4), z.back(0.15), z.sleeve('left', true, true), z.sleeve('right', true, true))
+      break
+    case 'windbreaker':
+      zones.push(z.leftChest(0.22), z.rightChest(0.22), z.upperBack(0.4), z.back(0.12), z.sleeve('left', true, true), z.sleeve('right', true, true))
       break
     case 'polo':
       zones.push(z.leftChest(0.25), z.rightChest(0.25), z.back(0.25), z.sleeve('left', false, false), z.sleeve('right', false, false))
       break
     case 'hoodie':
-      zones.push(z.leftChest(0.3), z.centre('centre-chest', 'Centre chest', 0.22, 0.36, 0.14), z.back(0.18), z.sleeve('left', true, true), z.sleeve('right', true, true))
+      zones.push(
+        z.leftChest(0.3),
+        z.rightChest(0.3),
+        z.centre('centre-chest', 'Centre chest', 0.22, 0.36, 0.14),
+        z.upperBack(0.42),
+        z.back(0.18),
+        z.sleeve('left', true, true),
+        z.sleeve('right', true, true),
+      )
       break
     case 'zip-hoodie':
-      zones.push(z.leftChest(0.3), z.rightChest(0.3), z.back(0.18), z.sleeve('left', true, true), z.sleeve('right', true, true))
+      zones.push(z.leftChest(0.3), z.rightChest(0.3), z.upperBack(0.42), z.back(0.18), z.sleeve('left', true, true), z.sleeve('right', true, true))
       break
     case 'sweatshirt':
-      zones.push(z.centre('centre-chest', 'Centre chest', 0.15, 0.42), z.leftChest(0.3), z.back(0.18), z.sleeve('left', true, true), z.sleeve('right', true, true))
+      zones.push(
+        z.centre('centre-chest', 'Centre chest', 0.15, 0.42),
+        z.fullFront(0.0),
+        z.leftChest(0.3),
+        z.rightChest(0.3),
+        z.upperBack(0.42),
+        z.back(0.18),
+        z.sleeve('left', true, true),
+        z.sleeve('right', true, true),
+      )
       break
     case 'jacket':
-      zones.push(z.leftChest(0.3), z.rightChest(0.3), z.back(0.2), z.sleeve('left', true, true), z.sleeve('right', true, true))
+      zones.push(z.leftChest(0.3), z.rightChest(0.3), z.upperBack(0.42), z.back(0.2), z.sleeve('left', true, true), z.sleeve('right', true, true))
       break
+  }
+  if (kind === 'oversized') {
+    // boxy fit: wider and deeper through the body, dropped shoulders and longer sleeves
+    const sx = 1.14
+    const sz = 1.07
+    for (const p of parts) p.geometry.scale(sx, 1.03, sz)
+    for (const zn of zones) {
+      if (zn.kind !== 'planar') continue
+      zn.origin = [zn.origin[0] * sx, zn.origin[1] * 1.03, zn.origin[2] * sz]
+      zn.rangeX *= sx
+    }
   }
   return { parts, zones }
 }
@@ -614,6 +774,9 @@ export const buildZipHoodie = () => buildTop('zip-hoodie')
 export const buildSweatshirt = () => buildTop('sweatshirt')
 export const buildPolo = () => buildTop('polo')
 export const buildJacket = () => buildTop('jacket')
+export const buildOversizedTee = () => buildTop('oversized')
+export const buildVarsity = () => buildTop('varsity')
+export const buildWindbreaker = () => buildTop('windbreaker')
 
 /* ------------------------------------------------------------------ */
 /* Joggers                                                             */

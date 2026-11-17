@@ -16,6 +16,12 @@ import {
   Crown,
   Footprints,
   Briefcase,
+  Gamepad2,
+  Laptop,
+  KeyRound,
+  NotebookPen,
+  Image as ImageIcon,
+  Milk,
   type LucideIcon,
 } from 'lucide-react'
 import { CATEGORIES, PRODUCTS } from '../../three/catalogue'
@@ -45,7 +51,23 @@ const ICONS: Record<string, LucideIcon> = {
   'phone-case': Smartphone,
   lanyard: IdCard,
   sticker: Sticker,
+  'oversized-tee': Shirt,
+  'varsity-jacket': Shirt,
+  windbreaker: Shirt,
+  'controller-skin': Gamepad2,
+  'laptop-sleeve': Laptop,
+  'headset-stand': Headphones,
+  'travel-mug': Coffee,
+  'sports-bottle': Milk,
+  tumbler: CupSoda,
+  keyring: KeyRound,
+  notebook: NotebookPen,
+  poster: ImageIcon,
 }
+
+/** Pre-rendered product thumbnails (generated from the 3D models by scripts/make-thumbs.py). */
+const THUMBS = import.meta.glob('../../assets/thumbs/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
+const thumbFor = (id: string) => THUMBS[`../../assets/thumbs/${id}.webp`]
 
 export function CatalogueSidebar() {
   const current = useStudio((s) => s.design.productId)
@@ -66,7 +88,7 @@ export function CatalogueSidebar() {
         </label>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" aria-hidden />
-          <input id="catalogue-search" className="input pl-9" placeholder="Search 23 products" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input id="catalogue-search" className="input pl-9" placeholder={`Search ${PRODUCTS.length} products`} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
       </div>
       <nav className="scroll-thin flex-1 overflow-y-auto px-2 pb-4" aria-label="Merchandise catalogue">
@@ -93,9 +115,15 @@ export function CatalogueSidebar() {
                           active ? 'bg-accent-soft text-white' : 'text-slate-300 hover:bg-white/5 hover:text-white'
                         }`}
                       >
-                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md border ${active ? 'border-accent/60 bg-accent/15' : 'border-white/8 bg-navy-800'}`}>
-                          <Icon className={`h-4 w-4 ${active ? 'text-accent' : 'text-slate-400 group-hover:text-slate-200'}`} aria-hidden />
-                        </span>
+                        {thumbFor(p.id) ? (
+                          <span className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-[#e9eaee] ${active ? 'border-accent' : 'border-white/8'}`}>
+                            <img src={thumbFor(p.id)} alt="" width={48} height={48} loading="lazy" decoding="async" className="h-12 w-12 object-contain" />
+                          </span>
+                        ) : (
+                          <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border ${active ? 'border-accent/60 bg-accent/15' : 'border-white/8 bg-navy-800'}`}>
+                            <Icon className={`h-5 w-5 ${active ? 'text-accent' : 'text-slate-400 group-hover:text-slate-200'}`} aria-hidden />
+                          </span>
+                        )}
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-medium">{p.name}</span>
                           <span className="block truncate text-[11px] text-slate-500">{p.description}</span>

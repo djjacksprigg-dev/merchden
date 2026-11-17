@@ -1,19 +1,23 @@
 # Asset & licence register
 
-Last reviewed: 15 November 2026.
+Last reviewed: 17 November 2026 (Merch Forge 2.0).
 
 ## 3D models
 
-All 23 product models are **original procedural geometry written for this project** (`src/three/models/*.ts`). They are generated at runtime from code. No third-party model files, scans or images are used.
+All 35 product models are **original procedural geometry written for this project** (`src/three/models/*.ts`). They are generated at runtime from code. No third-party model files, scans or images are used.
 
 | Product(s) | Source | Licence | Attribution needed |
 | --- | --- | --- | --- |
-| Jersey, T-shirt, hoodie, zip hoodie, sweatshirt, polo, tracksuit jacket, joggers | Original procedural (`garments.ts`) | MIT (this project) | No |
+| Jersey, T-shirt, oversized T-shirt, hoodie, zip hoodie, sweatshirt, polo, tracksuit jacket, varsity jacket, windbreaker, joggers | Original procedural (`garments.ts`); drapes from the project's own cloth simulation (`scripts/bake-cloth.ts`) | MIT (this project) | No |
 | Baseball cap, beanie, bucket hat | Original procedural (`headwear.ts`) | MIT (this project) | No |
 | Mouse mats, gaming chair, headset | Original procedural (`gaming.ts`) | MIT (this project) | No |
 | Bottle, mug, backpack, drawstring bag, tote, phone case, lanyard, sticker | Original procedural (`everyday.ts`) | MIT (this project) | No |
+| Controller skin, laptop sleeve, headset stand, travel mug, sports bottle, tumbler, keyring, notebook, poster | Original procedural (`extras.ts`) | MIT (this project) | No |
+| Catalogue thumbnails (`src/assets/thumbs/*.webp`) | Rendered from the procedural models above by `scripts/make-thumbs.py` | MIT (this project) | No |
 
-The phone case uses a generic phone shape and does not reproduce any manufacturer's product design or trademark.
+The phone case and controller use generic shapes and do not reproduce any manufacturer's product design, button symbols or trademarks.
+
+No licensed third-party 3D model files are used. Every product is a genuine 3D model – none are flat photographs presented as 3D.
 
 ## Textures, lighting, images
 
@@ -40,7 +44,6 @@ No stock photos, AI-generated images, scraped merchandise imagery, watermarked i
 | @react-three/fiber, @react-three/drei | MIT |
 | zustand | MIT |
 | lucide-react | ISC |
-| idb-keyval | Apache-2.0 |
 | fflate | MIT |
 | @fontsource-variable/inter | OFL-1.1 (font), MIT (package) |
 
