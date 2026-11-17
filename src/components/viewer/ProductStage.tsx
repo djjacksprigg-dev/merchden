@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
-import { Box3, CanvasTexture, Group, MeshStandardMaterial, SRGBColorSpace, Sphere, type BufferGeometry, type Texture } from 'three'
+import { Box3, CanvasTexture, Group, Mesh, MeshStandardMaterial, Raycaster, SRGBColorSpace, Sphere, type BufferGeometry, type Texture } from 'three'
 import type { Design, LogoLayer } from '../../lib/types'
 import { useStudio } from '../../state/studio'
 import { loadBuilder, patternColorsOf, PRODUCT_MAP } from '../../three/catalogue'
@@ -21,6 +21,73 @@ interface Loaded {
   radius: number
   floorY: number
   center: [number, number, number]
+}
+
+/** Part meshes of the product on screen, so logos can be dragged across them. */
+const partMeshes = new Map<string, Mesh>()
+const dragRay = new Raycaster()
+
+/**
+ * Lets students grab a logo or text on the 3D product and drag it.
+ * The pointer is ray-cast against the garment surface and converted to the
+ * placement area's offsets, so the print stays inside the real print area.
+ */
+function useDecalDrag(layer: LogoLayer, zone: Zone, part: Part) {
+  const controls = useThree((s) => s.controls) as unknown as { enabled: boolean } | null
+  const dragging = useRef(false)
+  const grab = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null)
+  const locked = !!layer.locked
+  const surfaceOffsets = (e: ThreeEvent<PointerEvent>) => {
+    const mesh = partMeshes.get(part.key)
+    if (!mesh) return null
+    dragRay.set(e.ray.origin, e.ray.direction)
+    const hit = dragRay.intersectObject(mesh, false)[0]
+    return hit ? pointToOffsets(zone, mesh.worldToLocal(hit.point.clone())) : null
+  }
+  const end = (e: ThreeEvent<PointerEvent>) => {
+    if (!dragging.current) return
+    dragging.current = false
+    grab.current = null
+    ;(e.target as unknown as Element).releasePointerCapture?.(e.pointerId)
+    if (controls) controls.enabled = true
+    document.body.style.cursor = ''
+  }
+  return {
+    onPointerDown: (e: ThreeEvent<PointerEvent>) => {
+      const st = useStudio.getState()
+      if (st.renderOverride || e.button !== 0) return
+      e.stopPropagation()
+      st.selectLayer(layer.id)
+      if (layer.text) st.setRightTab('text')
+      else if (st.rightTab !== 'logo') st.setRightTab('logo')
+      if (locked) return
+      const start = surfaceOffsets(e)
+      // keep the point you grabbed under the pointer (no jump)
+      grab.current = start ? { x: start.offsetX, y: start.offsetY, ox: layer.offsetX, oy: layer.offsetY } : null
+      dragging.current = true
+      ;(e.target as unknown as Element).setPointerCapture?.(e.pointerId)
+      if (controls) controls.enabled = false
+      document.body.style.cursor = 'grabbing'
+    },
+    onPointerMove: (e: ThreeEvent<PointerEvent>) => {
+      if (!dragging.current) return
+      e.stopPropagation()
+      const off = surfaceOffsets(e)
+      if (!off) return
+      const g = grab.current
+      const c = (v: number) => Math.max(-1, Math.min(1, v))
+      useStudio.getState().updateLayer(layer.id, g ? { offsetX: c(g.ox + off.offsetX - g.x), offsetY: c(g.oy + off.offsetY - g.y) } : off)
+    },
+    onPointerUp: end,
+    onPointerCancel: end,
+    onPointerOver: (e: ThreeEvent<PointerEvent>) => {
+      e.stopPropagation()
+      if (!dragging.current) document.body.style.cursor = locked ? 'not-allowed' : 'grab'
+    },
+    onPointerOut: () => {
+      if (!dragging.current) document.body.style.cursor = ''
+    },
+  }
 }
 
 function disposeModel(m: ProductModel) {
@@ -287,6 +354,10 @@ function PartMesh({ part, def, design, quality, zones, model }: { part: Part; de
     <>
     {interior && <mesh geometry={part.geometry} material={interior} receiveShadow={quality === 'high'} />}
     <mesh
+      ref={(m: Mesh | null) => {
+        if (m) partMeshes.set(part.key, m)
+        else if (partMeshes.get(part.key)?.geometry === part.geometry) partMeshes.delete(part.key)
+      }}
       geometry={part.geometry}
       material={material}
       castShadow={quality === 'high' && part.special !== 'transparent' && part.finish !== 'glass'}
@@ -323,8 +394,9 @@ function LogoDecal({ layer, zone, part, quality, order }: { layer: LogoLayer; zo
     material.polygonOffsetFactor = -4 - order
     material.polygonOffsetUnits = -4 - order
   }, [material, opacity, order])
+  const drag = useDecalDrag(layer, zone, part)
   if (!geometry || !material) return null
-  return <mesh geometry={geometry} material={material} renderOrder={2 + order * 0.01} receiveShadow={quality === 'high'} />
+  return <mesh geometry={geometry} material={material} renderOrder={2 + order * 0.01} receiveShadow={quality === 'high'} {...drag} />
 }
 
 /* ------------------------------------------------------------------ */
@@ -360,6 +432,7 @@ function TextDecal({ layer, zone, part, quality, order }: { layer: LogoLayer; zo
     material.polygonOffsetFactor = -4 - order
     material.polygonOffsetUnits = -4 - order
   }, [material, opacity, order])
+  const drag = useDecalDrag(layer, zone, part)
   if (!geometry || !material) return null
-  return <mesh geometry={geometry} material={material} renderOrder={2 + order * 0.01} receiveShadow={quality === 'high'} />
+  return <mesh geometry={geometry} material={material} renderOrder={2 + order * 0.01} receiveShadow={quality === 'high'} {...drag} />
 }

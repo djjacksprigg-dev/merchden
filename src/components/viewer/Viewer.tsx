@@ -191,7 +191,7 @@ function Hint() {
         <Orbit className="h-3.5 w-3.5 text-accent" aria-hidden /> Drag to rotate · scroll or pinch to zoom
       </p>
       <p className="mt-1 flex items-center gap-2">
-        <MousePointer2 className="h-3.5 w-3.5 text-accent" aria-hidden /> Double-click the product to move the selected logo there
+        <MousePointer2 className="h-3.5 w-3.5 text-accent" aria-hidden /> Grab a logo or text on the product to drag it · double-click to jump it there
       </p>
     </div>
   )
