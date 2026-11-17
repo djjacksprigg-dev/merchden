@@ -55,6 +55,8 @@ const ICONS: Record<string, LucideIcon> = {
   'varsity-jacket': Shirt,
   windbreaker: Shirt,
   'controller-skin': Gamepad2,
+  'controller-skin-symmetric': Gamepad2,
+  'handheld-skin': Gamepad2,
   'laptop-sleeve': Laptop,
   'headset-stand': Headphones,
   'travel-mug': Coffee,

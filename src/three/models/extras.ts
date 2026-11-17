@@ -37,23 +37,12 @@ const wrap = (id: string, label: string, target: string, y: number, angle: numbe
 /* Controller skin                                                     */
 /* ------------------------------------------------------------------ */
 
-/** Generic two-grip gamepad outline (not modelled on any brand's controller). */
-function controllerShape(): Shape {
-  const half: [number, number][] = [
-    [0, 0.235],
-    [0.2, 0.245],
-    [0.36, 0.225],
-    [0.47, 0.15],
-    [0.53, 0.0],
-    [0.565, -0.2],
-    [0.555, -0.36],
-    [0.5, -0.46],
-    [0.41, -0.48],
-    [0.34, -0.42],
-    [0.27, -0.29],
-    [0.17, -0.17],
-    [0.06, -0.15],
-  ]
+/**
+ * Generic gamepad outlines. Layouts follow the common families students know
+ * (offset sticks, symmetric sticks, handheld with detachable sides) but no
+ * manufacturer's exact shape, logo, name or button symbols are reproduced.
+ */
+function padShape(half: [number, number][]): Shape {
   const pts = [...half, ...half.slice().reverse().map(([x, y]) => [-x, y] as [number, number])].map(([x, y]) => new Vector2(x, y))
   const s = new Shape()
   s.moveTo(pts[0].x, pts[0].y)
@@ -61,69 +50,230 @@ function controllerShape(): Shape {
   return s
 }
 
-export function buildControllerSkin(): ProductModel {
-  const depth = 0.12
-  const bevel = 0.045
-  const top = depth / 2 + bevel
-  const shell = extrude(controllerShape(), depth, bevel, 64)
+const OFFSET_OUTLINE: [number, number][] = [
+  [0, 0.235], [0.2, 0.245], [0.36, 0.225], [0.47, 0.15], [0.53, 0.0], [0.565, -0.2], [0.555, -0.36], [0.5, -0.46],
+  [0.41, -0.48], [0.34, -0.42], [0.27, -0.29], [0.17, -0.17], [0.06, -0.15],
+]
+// longer, slimmer grips that sweep further down and out
+const SYMMETRIC_OUTLINE: [number, number][] = [
+  [0, 0.25], [0.22, 0.255], [0.39, 0.235], [0.5, 0.16], [0.56, 0.02], [0.6, -0.2], [0.62, -0.42], [0.58, -0.56],
+  [0.49, -0.6], [0.41, -0.53], [0.33, -0.36], [0.24, -0.25], [0.1, -0.22],
+]
 
-  // the vinyl skin: same outline, with cut-outs around the sticks and buttons
-  const skinShape = controllerShape()
-  const holes: [number, number, number][] = [
-    [-0.27, 0.07, 0.085], // left stick
-    [0.14, -0.1, 0.085], // right stick
-    [-0.15, -0.1, 0.075], // d-pad
-    [0.29, 0.07, 0.105], // face buttons
-    [-0.06, 0.08, 0.026], // view
-    [0.06, 0.08, 0.026], // menu
-    [0, 0.16, 0.042], // home
-  ]
+type Btn = [number, number, number] // x, y, radius of the skin cut-out
+
+interface PadLayout {
+  outline: [number, number][]
+  sticks: [number, number][]
+  dpad: [number, number]
+  face: [number, number]
+  small: [number, number][]
+  home: [number, number]
+  touchpad?: { x: number; y: number; w: number; h: number }
+  grips: [number, number]
+}
+
+const PADS: Record<'offset' | 'symmetric', PadLayout> = {
+  offset: {
+    outline: OFFSET_OUTLINE,
+    sticks: [[-0.27, 0.07], [0.14, -0.1]],
+    dpad: [-0.15, -0.1],
+    face: [0.29, 0.07],
+    small: [[-0.06, 0.08], [0.06, 0.08]],
+    home: [0, 0.16],
+    grips: [0.42, -0.3],
+  },
+  symmetric: {
+    outline: SYMMETRIC_OUTLINE,
+    sticks: [[-0.17, -0.13], [0.17, -0.13]],
+    dpad: [-0.36, 0.06],
+    face: [0.36, 0.06],
+    small: [[-0.25, 0.17], [0.25, 0.17]],
+    home: [0, -0.045],
+    touchpad: { x: 0, y: 0.105, w: 0.34, h: 0.2 },
+    grips: [0.5, -0.4],
+  },
+}
+
+function stickGeo(x: number, y: number, top: number) {
+  return merge([
+    transform(lathe([[0, 0], [0.06, 0], [0.062, 0.01], [0.04, 0.03], [0.036, 0.06], [0.0, 0.06]], 32), { rotation: [Math.PI / 2, 0, 0], position: [x, y, top] }),
+    transform(lathe([[0, 0], [0.058, 0], [0.062, 0.012], [0.058, 0.02], [0.03, 0.026], [0, 0.024]], 40), { rotation: [Math.PI / 2, 0, 0], position: [x, y, top + 0.058] }),
+  ])
+}
+function dpadGeo(x: number, y: number, top: number) {
+  return merge([
+    transform(roundedBox(0.12, 0.04, 0.03, 0.008, 2), { position: [x, y, top + 0.012] }),
+    transform(roundedBox(0.04, 0.12, 0.03, 0.008, 2), { position: [x, y, top + 0.012] }),
+  ])
+}
+function faceGeo(x: number, y: number, top: number, spread = 0.06, r = 0.026) {
+  return merge(
+    [
+      [x, y + spread],
+      [x, y - spread],
+      [x - spread, y],
+      [x + spread, y],
+    ].map(([px, py]) => orientedCylinder(V(px, py, top + 0.012), V(0, 0, 1), r, 0.026, 28)),
+  )
+}
+function cutOut(shape: Shape, holes: Btn[]) {
   for (const [x, y, r] of holes) {
     const h = new Path()
     h.absarc(x, y, r, 0, Math.PI * 2, true)
+    shape.holes.push(h)
+  }
+}
+
+function buildPad(kind: 'offset' | 'symmetric'): ProductModel {
+  const L = PADS[kind]
+  const depth = 0.12
+  const bevel = 0.045
+  const top = depth / 2 + bevel
+  const shell = extrude(padShape(L.outline), depth, bevel, 64)
+
+  // the vinyl skin: same outline, cut out around sticks, buttons and touchpad
+  const skinShape = padShape(L.outline)
+  cutOut(skinShape, [
+    ...L.sticks.map(([x, y]) => [x, y, 0.085] as Btn),
+    [L.dpad[0], L.dpad[1], 0.075],
+    [L.face[0], L.face[1], 0.105],
+    ...L.small.map(([x, y]) => [x, y, 0.026] as Btn),
+    [L.home[0], L.home[1], 0.042],
+  ])
+  if (L.touchpad) {
+    const t = L.touchpad
+    const h = new Path()
+    h.moveTo(t.x - t.w / 2 - 0.01, t.y - t.h / 2 - 0.01)
+    h.lineTo(t.x - t.w / 2 - 0.01, t.y + t.h / 2 + 0.01)
+    h.lineTo(t.x + t.w / 2 + 0.01, t.y + t.h / 2 + 0.01)
+    h.lineTo(t.x + t.w / 2 + 0.01, t.y - t.h / 2 - 0.01)
+    h.closePath()
     skinShape.holes.push(h)
   }
   const skin = planarUV(extrude(skinShape, 0.003, 0, 64), 'z')
   skin.translate(0, 0, top + 0.002)
 
-  const stick = (x: number, y: number) =>
-    merge([
-      transform(lathe([[0, 0], [0.06, 0], [0.062, 0.01], [0.04, 0.03], [0.036, 0.06], [0.0, 0.06]], 32), { rotation: [Math.PI / 2, 0, 0], position: [x, y, top] }),
-      transform(lathe([[0, 0], [0.058, 0], [0.062, 0.012], [0.058, 0.02], [0.03, 0.026], [0, 0.024]], 40), { rotation: [Math.PI / 2, 0, 0], position: [x, y, top + 0.058] }),
-    ])
-  const sticks = merge([stick(-0.27, 0.07), stick(0.14, -0.1)])
-  const dpad = merge([
-    transform(roundedBox(0.12, 0.04, 0.03, 0.008, 2), { position: [-0.15, -0.1, top + 0.012] }),
-    transform(roundedBox(0.04, 0.12, 0.03, 0.008, 2), { position: [-0.15, -0.1, top + 0.012] }),
-  ])
-  const face = merge(
-    [
-      [0.29, 0.13],
-      [0.29, 0.01],
-      [0.23, 0.07],
-      [0.35, 0.07],
-    ].map(([x, y]) => orientedCylinder(V(x, y, top + 0.012), V(0, 0, 1), 0.026, 0.026, 28)),
-  )
-  const small = merge([orientedCylinder(V(-0.06, 0.08, top + 0.006), V(0, 0, 1), 0.017, 0.012, 20), orientedCylinder(V(0.06, 0.08, top + 0.006), V(0, 0, 1), 0.017, 0.012, 20)])
-  const home = orientedCylinder(V(0, 0.16, top + 0.008), V(0, 0, 1), 0.032, 0.014, 32)
-  // shoulder bumpers
-  const bumper = (sx: number) =>
-    createTube([V(sx * 0.18, 0.245, 0.0), V(sx * 0.33, 0.236, 0.0), V(sx * 0.45, 0.18, 0.0)], () => [0.03, 0.05], { up: V(0, 0, 1), radial: 16, segments: 24, capStart: true, capEnd: true }).geometry
+  const buttons = merge([dpadGeo(L.dpad[0], L.dpad[1], top), faceGeo(L.face[0], L.face[1], top), ...L.small.map(([x, y]) => orientedCylinder(V(x, y, top + 0.006), V(0, 0, 1), 0.017, 0.012, 20))])
+  const home = orientedCylinder(V(L.home[0], L.home[1], top + 0.008), V(0, 0, 1), 0.032, 0.014, 32)
+  const shoulder = (sx: number) =>
+    createTube([V(sx * 0.18, 0.25, 0.0), V(sx * 0.34, 0.24, 0.0), V(sx * 0.46, 0.18, 0.0)], () => [0.03, 0.05], { up: V(0, 0, 1), radial: 16, segments: 24, capStart: true, capEnd: true }).geometry
   const parts: Part[] = [
     { key: 'shell', geometry: shell, finish: 'plastic', slot: 'secondary' },
     { key: 'skin', geometry: skin, finish: 'paper', slot: 'primary', pattern: 'flat' },
-    { key: 'sticks', geometry: sticks, finish: 'rubber', color: '#1a1c21' },
-    { key: 'buttons', geometry: merge([dpad, face, small]), finish: 'gloss', slot: 'accent' },
+    { key: 'sticks', geometry: merge(L.sticks.map(([x, y]) => stickGeo(x, y, top))), finish: 'rubber', color: '#1a1c21' },
+    { key: 'buttons', geometry: buttons, finish: 'gloss', slot: 'accent' },
     { key: 'home', geometry: home, finish: 'gloss', color: '#e9ebef' },
-    { key: 'bumpers', geometry: merge([bumper(1), bumper(-1)]), finish: 'plastic', slot: 'secondary', shade: 0.85 },
+    { key: 'bumpers', geometry: merge([shoulder(1), shoulder(-1)]), finish: 'plastic', slot: 'secondary', shade: 0.85 },
   ]
+  if (L.touchpad) {
+    const t = L.touchpad
+    const pad = extrude(roundedRectShape(t.w, t.h, 0.025), 0.01, 0.003, 12)
+    pad.translate(t.x, t.y, top + 0.004)
+    parts.push({ key: 'touchpad', geometry: pad, finish: 'plastic', slot: 'secondary', shade: 0.92 })
+  }
   const z = top + 0.004
+  const [gx, gy] = L.grips
+  const centreY = kind === 'symmetric' ? -0.165 : -0.06
   const zones: Zone[] = [
-    planar('centre', 'Centre', 'skin', [0, -0.06, z], { size: 0.14, maxSize: 0.2, rangeX: 0.03, rangeY: 0.04, depth: 0.03 }),
-    planar('left-grip', 'Left grip', 'skin', [-0.42, -0.3, z], { size: 0.13, maxSize: 0.18, rangeX: 0.04, rangeY: 0.06, depth: 0.03 }),
-    planar('right-grip', 'Right grip', 'skin', [0.42, -0.3, z], { size: 0.13, maxSize: 0.18, rangeX: 0.04, rangeY: 0.06, depth: 0.03 }),
+    planar('centre', kind === 'symmetric' ? 'Between the sticks' : 'Centre', 'skin', [0, centreY, z], kind === 'symmetric' ? { size: 0.08, maxSize: 0.1, rangeX: 0.01, rangeY: 0.01, depth: 0.03 } : { size: 0.12, maxSize: 0.18, rangeX: 0.02, rangeY: 0.03, depth: 0.03 }),
+    planar('left-grip', 'Left grip', 'skin', [-gx, gy, z], { size: 0.13, maxSize: 0.18, rangeX: 0.04, rangeY: 0.06, depth: 0.03 }),
+    planar('right-grip', 'Right grip', 'skin', [gx, gy, z], { size: 0.13, maxSize: 0.18, rangeX: 0.04, rangeY: 0.06, depth: 0.03 }),
   ]
   return { parts, zones }
+}
+
+/** Offset-stick layout (the style used by many PC / Xbox-type pads). */
+export const buildControllerSkin = () => buildPad('offset')
+/** Symmetric-stick layout with a touchpad (PlayStation-type layout). */
+export const buildControllerSkinSymmetric = () => buildPad('symmetric')
+
+/** Handheld console with detachable side controllers (Switch-type layout). */
+export function buildHandheldSkin(): ProductModel {
+  const H = 0.62
+  const CW = 0.98 // console body
+  const RW = 0.27 // each side controller
+  const T = 0.1
+  const top = T / 2 + 0.012
+  const railShape = (side: -1 | 1) => {
+    const s = new Shape()
+    const x0 = side < 0 ? -CW / 2 - RW : CW / 2
+    const x1 = x0 + RW
+    const r = 0.17
+    if (side < 0) {
+      s.moveTo(x1, -H / 2)
+      s.lineTo(x1, H / 2)
+      s.lineTo(x0 + r, H / 2)
+      s.quadraticCurveTo(x0, H / 2, x0, H / 2 - r)
+      s.lineTo(x0, -H / 2 + r)
+      s.quadraticCurveTo(x0, -H / 2, x0 + r, -H / 2)
+    } else {
+      s.moveTo(x0, -H / 2)
+      s.lineTo(x1 - r, -H / 2)
+      s.quadraticCurveTo(x1, -H / 2, x1, -H / 2 + r)
+      s.lineTo(x1, H / 2 - r)
+      s.quadraticCurveTo(x1, H / 2, x1 - r, H / 2)
+      s.lineTo(x0, H / 2)
+    }
+    s.closePath()
+    return s
+  }
+  const lx = -CW / 2 - RW / 2
+  const rx = CW / 2 + RW / 2
+  const holesL: Btn[] = [[lx, 0.12, 0.075], [lx, -0.09, 0.09], [lx + 0.07, 0.25, 0.02]]
+  const holesR: Btn[] = [[rx, 0.12, 0.09], [rx, -0.09, 0.075], [rx - 0.07, 0.25, 0.02]]
+  const rails = merge([extrude(railShape(-1), T, 0.012, 24), extrude(railShape(1), T, 0.012, 24)])
+  const skinL = railShape(-1)
+  cutOut(skinL, holesL)
+  const skinR = railShape(1)
+  cutOut(skinR, holesR)
+  const skinFront = planarUV(merge([extrude(skinL, 0.003, 0, 24), extrude(skinR, 0.003, 0, 24)]), 'z')
+  skinFront.translate(0, 0, top + 0.001)
+
+  const body = roundedBox(CW, H, T * 0.92, 0.015, 3)
+  const bezel = extrude(roundedRectShape(CW - 0.04, H - 0.04, 0.03), 0.004, 0, 12)
+  bezel.translate(0, 0, T * 0.46)
+  const screen = extrude(roundedRectShape(CW - 0.16, H - 0.12, 0.01), 0.004, 0, 8)
+  screen.translate(0, 0, T * 0.46 + 0.003)
+  // back skin covers the console body and both controllers
+  const backShape = new Shape()
+  backShape.moveTo(-CW / 2 + 0.02, -H / 2 + 0.03)
+  backShape.lineTo(CW / 2 - 0.02, -H / 2 + 0.03)
+  backShape.lineTo(CW / 2 - 0.02, H / 2 - 0.03)
+  backShape.lineTo(-CW / 2 + 0.02, H / 2 - 0.03)
+  backShape.closePath()
+  const skinBack = planarUV(extrude(backShape, 0.003, 0, 4), 'z')
+  skinBack.rotateY(Math.PI)
+  skinBack.translate(0, 0, -T * 0.46 - 0.004)
+
+  const buttons = merge([
+    dpadLike(lx, -0.09, top),
+    faceGeo(rx, 0.12, top, 0.055, 0.022),
+    orientedCylinder(V(lx + 0.07, 0.25, top + 0.004), V(0, 0, 1), 0.012, 0.01, 16),
+    orientedCylinder(V(rx - 0.07, 0.25, top + 0.004), V(0, 0, 1), 0.012, 0.01, 16),
+  ])
+  const parts: Part[] = [
+    { key: 'rails', geometry: rails, finish: 'plastic', slot: 'secondary' },
+    { key: 'skin', geometry: skinFront, finish: 'paper', slot: 'primary', pattern: 'flat' },
+    { key: 'console', geometry: body, finish: 'plastic', color: '#26282e' },
+    { key: 'skin-back', geometry: skinBack, finish: 'paper', slot: 'primary', pattern: 'flat' },
+    { key: 'bezel', geometry: bezel, finish: 'gloss', color: '#0d0e11' },
+    { key: 'screen', geometry: screen, finish: 'glass', color: '#121620' },
+    { key: 'sticks', geometry: merge([stickGeo(lx, 0.12, top - 0.01), stickGeo(rx, -0.09, top - 0.01)]), finish: 'rubber', color: '#1a1c21' },
+    { key: 'buttons', geometry: buttons, finish: 'gloss', slot: 'accent' },
+  ]
+  const z = top + 0.003
+  const zones: Zone[] = [
+    planar('left-controller', 'Left controller', 'skin', [lx, -0.22, z], { size: 0.1, maxSize: 0.14, rangeX: 0.02, rangeY: 0.03, depth: 0.03 }),
+    planar('right-controller', 'Right controller', 'skin', [rx, -0.22, z], { size: 0.1, maxSize: 0.14, rangeX: 0.02, rangeY: 0.02, depth: 0.03 }),
+    { ...planar('back', 'Back of console', 'skin-back', [0, 0, -T * 0.46 - 0.02], { size: 0.4, maxSize: 0.6, rangeX: 0.25, rangeY: 0.12, depth: 0.04 }), normal: [0, 0, -1] },
+  ]
+  return { parts, zones }
+}
+
+/** Four separate direction buttons, as on detachable handheld controllers. */
+function dpadLike(x: number, y: number, top: number) {
+  return faceGeo(x, y, top, 0.055, 0.022)
 }
 
 /* ------------------------------------------------------------------ */
