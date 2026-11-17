@@ -90,7 +90,7 @@ export async function buildPresentationSheet(items: SheetItem[], project: Projec
   const HB = 360
   ctx.fillStyle = '#0b111d'
   ctx.fillRect(0, 0, W, HB)
-  ctx.fillStyle = '#2f8cff'
+  ctx.fillStyle = '#ff7a1a'
   ctx.fillRect(0, HB - 12, W, 12)
   let tx = 140
   const logoSrc = mainLogoSrc(items)
@@ -112,7 +112,7 @@ export async function buildPresentationSheet(items: SheetItem[], project: Projec
   ctx.fillText(project.projectName || 'Merchandise collection', tx, 275)
   ctx.textAlign = 'right'
   ctx.font = `700 44px ${FONT}`
-  ctx.fillStyle = '#2f8cff'
+  ctx.fillStyle = '#ff7a1a'
   ctx.fillText('MERCHANDISE COLLECTION', W - 140, 175)
   ctx.font = `500 40px ${FONT}`
   ctx.fillStyle = '#93a2bb'

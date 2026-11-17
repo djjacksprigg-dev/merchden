@@ -100,6 +100,7 @@ export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 export const VIEW_LABELS = {
   front: 'Front',
   back: 'Back',
-  side: 'Side',
+  side: 'Left',
+  right: 'Right',
   'three-quarter': 'Three-quarter',
 } as const

@@ -1,17 +1,18 @@
-import { Download, Image as ImageIcon, Info, Palette, Type } from 'lucide-react'
+import { BadgeCheck, Download, Image as ImageIcon, Palette, Type } from 'lucide-react'
 import { TextPanel } from '../text/TextPanel'
 import { useStudio, type RightTab } from '../../state/studio'
 import { LogoUploader } from '../logo/LogoUploader'
 import { PlacementPanel } from '../placement/PlacementPanel'
 import { ColourPanel } from '../colour/ColourPanel'
-import { InfoPanel } from '../project/InfoPanel'
+import { BrandKitPanel } from '../project/BrandKitPanel'
+import { LayersPanel } from '../placement/LayersPanel'
 import { ExportPanel } from '../export/ExportPanel'
 
 const TABS: { id: RightTab; label: string; icon: typeof Palette }[] = [
+  { id: 'brand', label: 'Brand Kit', icon: BadgeCheck },
   { id: 'logo', label: 'Graphics', icon: ImageIcon },
   { id: 'text', label: 'Text', icon: Type },
   { id: 'colour', label: 'Colours', icon: Palette },
-  { id: 'info', label: 'Project', icon: Info },
   { id: 'export', label: 'Export', icon: Download },
 ]
 
@@ -51,6 +52,10 @@ export function DesignSidebar() {
               <h2 className="panel-title mb-3">Logos &amp; images</h2>
               <LogoUploader />
             </section>
+            <section className="section" aria-label="Layers">
+              <h2 className="panel-title mb-3">Layers</h2>
+              <LayersPanel />
+            </section>
             <section className="section" aria-label="Logo placement">
               <h2 className="panel-title mb-3">Placement</h2>
               <PlacementPanel />
@@ -69,9 +74,10 @@ export function DesignSidebar() {
             <ColourPanel />
           </section>
         )}
-        {tab === 'info' && (
+        {tab === 'brand' && (
           <section className="section">
-            <InfoPanel />
+            <h2 className="panel-title mb-3">Brand Kit</h2>
+            <BrandKitPanel />
           </section>
         )}
         {tab === 'export' && (

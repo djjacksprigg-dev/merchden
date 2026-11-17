@@ -26,7 +26,7 @@ export type PatternId =
   | 'esports-camo'
   | 'custom'
 
-export type ViewName = 'front' | 'back' | 'side' | 'three-quarter'
+export type ViewName = 'front' | 'back' | 'side' | 'right' | 'three-quarter'
 
 export type StickerShape = 'die-cut' | 'circle' | 'rounded-square'
 
@@ -43,7 +43,14 @@ export interface TextStyle {
   arc: number
   /** Second line, smaller (e.g. a role or player number under a gamer tag) */
   subline?: string
+  bold?: boolean
+  italic?: boolean
+  /** Alignment of the two lines relative to each other */
+  align?: 'left' | 'center' | 'right'
 }
+
+/** What a layer is for – lets the jersey designer find and update its own layers */
+export type LayerRole = 'team-logo' | 'sponsor' | 'player-name' | 'player-number' | 'front-number' | 'sleeve-left' | 'sleeve-right' | 'slogan'
 
 export interface LogoLayer {
   id: string
@@ -59,6 +66,11 @@ export interface LogoLayer {
   rotation: number
   /** Present on text layers (then logoId is null) */
   text?: TextStyle
+  /** 0.1 – 1 */
+  opacity?: number
+  /** Locked layers cannot be moved or edited */
+  locked?: boolean
+  role?: LayerRole
 }
 
 export interface Design {
@@ -104,6 +116,59 @@ export interface ProjectInfo {
   orgName: string
   projectName: string
   rationale: string
+}
+
+export interface BrandKit {
+  orgName: string
+  primaryLogoId: string | null
+  secondaryLogoId: string | null
+  primary: string
+  secondary: string
+  accent: string
+  font: string
+  slogan: string
+}
+
+export interface PortfolioVersion {
+  id: string
+  label: string
+  /** JPEG data URL captured when the version was recorded */
+  image: string
+  design: Design
+  createdAt: number
+}
+
+export interface PortfolioProductNotes {
+  why: string
+  represents: string
+  appeal: string
+  improve: string
+  changes: string
+  reasons: string
+  versions: PortfolioVersion[]
+}
+
+export interface Portfolio {
+  studentProject: string
+  audience: string
+  /** keyed by collection design id */
+  products: Record<string, PortfolioProductNotes>
+  improvements: string
+}
+
+export interface ProjectFileV2 {
+  format: 'merchforge'
+  version: 2
+  savedAt: string
+  projectName: string
+  brandKit: BrandKit
+  /** all images used by the project (logos, sponsor logos, pattern images) */
+  images: LogoAsset[]
+  current: Design
+  drafts: Design[]
+  collection: SavedDesign[]
+  portfolio: Portfolio
+  settings: { scene: string; exportBackground: string; recentColors: string[] }
 }
 
 export interface ProjectFile {

@@ -152,17 +152,17 @@ export function ProductStage({ onFloor }: { onFloor: (y: number, radius: number)
         {model.parts.map((part) => (
           <PartMesh key={part.key} part={part} def={def} design={design} quality={quality} zones={model.zones} model={model} />
         ))}
-        {design.layers.map((layer) => {
+        {design.layers.map((layer, order) => {
           const zone = model.zones.find((z) => z.id === layer.zoneId)
           if (layer.text) {
             if (!zone || (zone.kind !== 'planar' && zone.kind !== 'wrap')) return null
             const tpart = model.parts.find((p) => p.key === zone.target)
-            return tpart ? <TextDecal key={layer.id} layer={layer} zone={zone} part={tpart} quality={quality} /> : null
+            return tpart ? <TextDecal key={layer.id} layer={layer} zone={zone} part={tpart} quality={quality} order={order} /> : null
           }
           if (!zone || (zone.kind !== 'planar' && zone.kind !== 'wrap')) return null
           const part = model.parts.find((p) => p.key === zone.target)
           if (!part) return null
-          return <LogoDecal key={layer.id} layer={layer} zone={zone} part={part} quality={quality} />
+          return <LogoDecal key={layer.id} layer={layer} zone={zone} part={part} quality={quality} order={order} />
         })}
       </group>
     </group>
@@ -300,7 +300,7 @@ function PartMesh({ part, def, design, quality, zones, model }: { part: Part; de
 
 /* ------------------------------------------------------------------ */
 
-function LogoDecal({ layer, zone, part, quality }: { layer: LogoLayer; zone: Zone; part: Part; quality: 'high' | 'low' }) {
+function LogoDecal({ layer, zone, part, quality, order }: { layer: LogoLayer; zone: Zone; part: Part; quality: 'high' | 'low'; order: number }) {
   const img = useLogoImage(layer.logoId)
   const aspect = img ? img.naturalWidth / img.naturalHeight : 1
   const geometry = useMemo<BufferGeometry | null>(() => {
@@ -315,13 +315,21 @@ function LogoDecal({ layer, zone, part, quality }: { layer: LogoLayer; zone: Zon
   }, [img, layer.logoId, part, quality])
   useEffect(() => () => geometry?.dispose(), [geometry])
   useEffect(() => () => material?.dispose(), [material])
+  const opacity = layer.opacity ?? 1
+  useEffect(() => {
+    if (!material) return
+    material.opacity = opacity
+    // later layers sit on top of earlier ones in the same area
+    material.polygonOffsetFactor = -4 - order
+    material.polygonOffsetUnits = -4 - order
+  }, [material, opacity, order])
   if (!geometry || !material) return null
-  return <mesh geometry={geometry} material={material} renderOrder={2} receiveShadow={quality === 'high'} />
+  return <mesh geometry={geometry} material={material} renderOrder={2 + order * 0.01} receiveShadow={quality === 'high'} />
 }
 
 /* ------------------------------------------------------------------ */
 
-function TextDecal({ layer, zone, part, quality }: { layer: LogoLayer; zone: Zone; part: Part; quality: 'high' | 'low' }) {
+function TextDecal({ layer, zone, part, quality, order }: { layer: LogoLayer; zone: Zone; part: Part; quality: 'high' | 'low'; order: number }) {
   const canvas = useTextCanvas(layer.text)
   const aspect = canvas ? canvas.width / canvas.height : 1
   const geometry = useMemo<BufferGeometry | null>(() => {
@@ -344,6 +352,14 @@ function TextDecal({ layer, zone, part, quality }: { layer: LogoLayer; zone: Zon
     },
     [material],
   )
+  const opacity = layer.opacity ?? 1
+  useEffect(() => {
+    if (!material) return
+    material.opacity = opacity
+    // later layers sit on top of earlier ones in the same area
+    material.polygonOffsetFactor = -4 - order
+    material.polygonOffsetUnits = -4 - order
+  }, [material, opacity, order])
   if (!geometry || !material) return null
-  return <mesh geometry={geometry} material={material} renderOrder={2} receiveShadow={quality === 'high'} />
+  return <mesh geometry={geometry} material={material} renderOrder={2 + order * 0.01} receiveShadow={quality === 'high'} />
 }

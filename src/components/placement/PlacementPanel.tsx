@@ -1,5 +1,5 @@
-import { useRef, type KeyboardEvent, type PointerEvent } from 'react'
-import { Crosshair, ImageOff, Plus, RotateCcw, Trash2 } from 'lucide-react'
+import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, Copy, Crosshair, ImageOff, Lock, Magnet, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { selectDef, useStudio } from '../../state/studio'
 import { Slider } from '../ui/controls'
 import type { LogoLayer } from '../../lib/types'
@@ -31,7 +31,8 @@ export function PlacementPanel() {
         <p className="field-label">Placement areas on the {def.shortName.toLowerCase()}</p>
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Placement areas">
           {zones.map((z) => {
-            const l = imageLayers.find((x) => x.zoneId === z.id)
+            const inZone = imageLayers.filter((x) => x.zoneId === z.id)
+            const l = inZone.find((x) => x.id === layer?.id) ?? inZone[0]
             const active = !!l && l.id === layer?.id
             return (
               <button
@@ -46,6 +47,7 @@ export function PlacementPanel() {
                 {!l && <Plus className="h-3 w-3" aria-hidden />}
                 {l && <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden />}
                 {z.label}
+                {inZone.length > 1 && <span className="text-[10px] text-slate-400">×{inZone.length}</span>}
               </button>
             )
           })}
@@ -56,7 +58,14 @@ export function PlacementPanel() {
       </div>
 
       {layer && zone ? (
-        <LayerEditor layer={layer} zone={zone} isSticker={isSticker} hasLogo={!!(layer.logoId && logos[layer.logoId])} onRemove={() => removeLayer(layer.id)} onChange={(p) => updateLayer(layer.id, p)} zones={zones} />
+        <>
+          {!isSticker && (zone.kind === 'planar' || zone.kind === 'wrap') && (
+            <button type="button" className="btn-ghost w-full justify-start text-xs" onClick={() => addLayer(zone.id)}>
+              <Plus className="h-3.5 w-3.5" aria-hidden /> Add another logo to {zone.label}
+            </button>
+          )}
+          <LayerEditor layer={layer} zone={zone} isSticker={isSticker} hasLogo={!!(layer.logoId && logos[layer.logoId])} onRemove={() => removeLayer(layer.id)} onChange={(p) => updateLayer(layer.id, p)} zones={zones} />
+        </>
       ) : (
         <p className="rounded-lg border border-white/8 bg-navy-850 p-3 text-sm text-slate-400">Choose a placement area above to add your logo.</p>
       )}
@@ -82,28 +91,42 @@ export function LayerEditor({
   onRemove: () => void
 }) {
   const resetLayerPosition = useStudio((s) => s.resetLayerPosition)
+  const duplicateLayer = useStudio((s) => s.duplicateLayer)
   const design = useStudio((s) => s.design)
+  const [snap, setSnap] = useState(true)
+  const locked = !!layer.locked
   const setStickerShape = useStudio((s) => s.setStickerShape)
   const movable = zone.kind === 'planar' || zone.kind === 'wrap'
-  const otherZones = zones.filter((z) => z.id !== zone.id && (z.kind === 'planar' || z.kind === 'wrap') && (layer.text ? true : !design.layers.some((l) => !l.text && l.zoneId === z.id)))
+  const otherZones = zones.filter((z) => z.id !== zone.id && (z.kind === 'planar' || z.kind === 'wrap'))
 
   return (
     <div className="space-y-4 rounded-xl border border-white/8 bg-navy-850 p-3">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold text-white">{zone.label}</p>
         <div className="flex">
-          <button type="button" className="btn-ghost px-2 py-1 text-xs" onClick={() => resetLayerPosition(layer.id)} aria-label="Reset logo position">
+          {!isSticker && (
+            <button type="button" className="btn-ghost px-2 py-1 text-xs" onClick={() => duplicateLayer(layer.id)} aria-label="Duplicate this layer">
+              <Copy className="h-3.5 w-3.5" aria-hidden />
+            </button>
+          )}
+          <button type="button" className="btn-ghost px-2 py-1 text-xs" disabled={locked} onClick={() => resetLayerPosition(layer.id)} aria-label="Reset logo position">
             <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Reset
           </button>
           {!isSticker && (
-            <button type="button" className="btn-danger px-2 py-1 text-xs" onClick={onRemove} aria-label={layer.text ? `Remove this text` : `Remove logo from ${zone.label}`}>
+            <button type="button" className="btn-danger px-2 py-1 text-xs" disabled={locked} onClick={onRemove} aria-label={layer.text ? `Remove this text` : `Remove logo from ${zone.label}`}>
               <Trash2 className="h-3.5 w-3.5" aria-hidden /> Remove
             </button>
           )}
         </div>
       </div>
 
-      {!hasLogo && (
+      {locked && (
+        <button type="button" className="flex w-full items-center gap-2 rounded-lg bg-accent-soft p-2 text-left text-xs text-orange-100" onClick={() => onChange({ locked: false })}>
+          <Lock className="h-4 w-4 shrink-0 text-accent" aria-hidden /> This layer is locked. Click to unlock and edit it.
+        </button>
+      )}
+
+      {!hasLogo && !layer.text && (
         <p className="flex items-center gap-2 rounded-lg bg-amber-500/10 p-2 text-xs text-amber-200">
           <ImageOff className="h-4 w-4 shrink-0" aria-hidden /> No logo on this area yet – upload one or pick one from your logos.
         </p>
@@ -128,7 +151,24 @@ export function LayerEditor({
         </div>
       )}
 
-      {movable && <PositionPad layer={layer} onChange={onChange} />}
+      <fieldset disabled={locked} className="space-y-4 disabled:opacity-50">
+      {movable && <PositionPad layer={layer} onChange={onChange} snap={snap} />}
+      {movable && (
+        <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Align within placement area">
+          <AlignBtn label="Align left" onClick={() => onChange({ offsetX: -1 })} icon={AlignStartVertical} />
+          <AlignBtn label="Centre horizontally" onClick={() => onChange({ offsetX: 0 })} icon={AlignCenterVertical} />
+          <AlignBtn label="Align right" onClick={() => onChange({ offsetX: 1 })} icon={AlignEndVertical} />
+          <AlignBtn label="Align top" onClick={() => onChange({ offsetY: 1 })} icon={AlignStartHorizontal} />
+          <AlignBtn label="Centre vertically" onClick={() => onChange({ offsetY: 0 })} icon={AlignCenterHorizontal} />
+          <AlignBtn label="Align bottom" onClick={() => onChange({ offsetY: -1 })} icon={AlignEndHorizontal} />
+          <button type="button" className="chip ml-auto px-2 py-1 text-[11px]" onClick={() => onChange({ offsetX: 0, offsetY: 0 })}>
+            <Crosshair className="h-3 w-3" aria-hidden /> Centre
+          </button>
+          <button type="button" className="chip px-2 py-1 text-[11px]" data-active={snap} aria-pressed={snap} onClick={() => setSnap(!snap)} title="Snap to centre and edge guides when dragging">
+            <Magnet className="h-3 w-3" aria-hidden /> Snap
+          </button>
+        </div>
+      )}
 
       {movable && (
         <div className="grid grid-cols-2 gap-3">
@@ -169,18 +209,34 @@ export function LayerEditor({
           </select>
         </div>
       )}
+      </fieldset>
     </div>
   )
 }
 
+function AlignBtn({ label, onClick, icon: Icon }: { label: string; onClick: () => void; icon: typeof Crosshair }) {
+  return (
+    <button type="button" className="rounded p-1.5 text-slate-300 hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-accent" onClick={onClick} aria-label={label} title={label}>
+      <Icon className="h-3.5 w-3.5" aria-hidden />
+    </button>
+  )
+}
+
+/** Pulls a value onto the nearest guide (edges, quarter lines, centre) when close. */
+export function snapValue(v: number, on: boolean) {
+  if (!on) return v
+  for (const g of [-1, -0.5, 0, 0.5, 1]) if (Math.abs(v - g) < 0.06) return g
+  return v
+}
+
 /** 2D pad for dragging the logo within its placement area (also keyboard operable). */
-function PositionPad({ layer, onChange }: { layer: LogoLayer; onChange: (p: Partial<LogoLayer>) => void }) {
+function PositionPad({ layer, onChange, snap }: { layer: LogoLayer; onChange: (p: Partial<LogoLayer>) => void; snap: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
   const set = (e: PointerEvent) => {
     const r = ref.current!.getBoundingClientRect()
     const x = ((e.clientX - r.left) / r.width) * 2 - 1
     const y = -(((e.clientY - r.top) / r.height) * 2 - 1)
-    onChange({ offsetX: Math.max(-1, Math.min(1, x)), offsetY: Math.max(-1, Math.min(1, y)) })
+    onChange({ offsetX: snapValue(Math.max(-1, Math.min(1, x)), snap), offsetY: snapValue(Math.max(-1, Math.min(1, y)), snap) })
   }
   const onKey = (e: KeyboardEvent) => {
     const step = e.shiftKey ? 0.1 : 0.03
@@ -213,8 +269,8 @@ function PositionPad({ layer, onChange }: { layer: LogoLayer; onChange: (p: Part
         className="relative h-28 w-full cursor-crosshair touch-none rounded-lg border border-white/10 bg-navy-950 focus-visible:outline-2 focus-visible:outline-accent"
         style={{ backgroundImage: 'linear-gradient(#ffffff0d 1px, transparent 1px), linear-gradient(90deg, #ffffff0d 1px, transparent 1px)', backgroundSize: '12.5% 25%' }}
       >
-        <span className="absolute left-1/2 top-0 h-full w-px bg-white/10" aria-hidden />
-        <span className="absolute left-0 top-1/2 h-px w-full bg-white/10" aria-hidden />
+        <span className={`absolute left-1/2 top-0 h-full w-px ${snap && layer.offsetX === 0 ? 'bg-accent' : 'bg-white/10'}`} aria-hidden />
+        <span className={`absolute left-0 top-1/2 h-px w-full ${snap && layer.offsetY === 0 ? 'bg-accent' : 'bg-white/10'}`} aria-hidden />
         <span
           className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-accent shadow-lg"
           style={{ left: `${(layer.offsetX + 1) * 50}%`, top: `${(1 - layer.offsetY) * 50}%`, transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)` }}

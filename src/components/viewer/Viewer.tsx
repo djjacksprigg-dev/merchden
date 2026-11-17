@@ -1,7 +1,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping, PCFSoftShadowMap, SRGBColorSpace } from 'three'
-import { Box, LoaderCircle, MousePointer2, Orbit, Palette, Pause, Play, RotateCcw } from 'lucide-react'
+import { Box, LoaderCircle, MousePointer2, Orbit, Palette, Pause, Play, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
 import { SCENES, SCENE_MAP } from '../../three/scenes'
 import { useThree } from '@react-three/fiber'
 import { useStudio } from '../../state/studio'
@@ -110,7 +110,8 @@ function ViewControls() {
     () => [
       { id: 'front', label: 'Front' },
       { id: 'back', label: 'Back' },
-      { id: 'side', label: def.sideLabel ?? 'Side' },
+      { id: 'side', label: def.sideLabel ?? 'Left' },
+      ...(def.sideLabel ? [] : [{ id: 'right' as ViewName, label: 'Right' }]),
       { id: 'three-quarter', label: '¾' },
     ],
     [def],
@@ -118,11 +119,17 @@ function ViewControls() {
   return (
     <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-white/10 bg-navy-900/85 p-1 shadow-lg backdrop-blur" role="toolbar" aria-label="Camera views">
       {views.map((v) => (
-        <button key={v.id} type="button" className="view-btn" onClick={() => requestView(v.id)} aria-label={`${v.id === 'three-quarter' ? 'Three-quarter' : v.label} view`}>
+        <button key={v.id} type="button" className="view-btn" onClick={() => requestView(v.id)} aria-label={`${v.id === 'three-quarter' ? 'Three-quarter' : v.id === 'side' && !def.sideLabel ? 'Left side' : v.id === 'right' ? 'Right side' : v.label} view`}>
           {v.label}
         </button>
       ))}
       <span className="mx-1 h-5 w-px bg-white/10" aria-hidden />
+      <button type="button" className="view-btn" onClick={() => window.dispatchEvent(new CustomEvent('mf-zoom', { detail: 0.82 }))} aria-label="Zoom in" title="Zoom in">
+        <ZoomIn className="h-4 w-4" aria-hidden />
+      </button>
+      <button type="button" className="view-btn" onClick={() => window.dispatchEvent(new CustomEvent('mf-zoom', { detail: 1.22 }))} aria-label="Zoom out" title="Zoom out">
+        <ZoomOut className="h-4 w-4" aria-hidden />
+      </button>
       <button type="button" className="view-btn" onClick={() => requestView('reset')} aria-label="Reset camera" title="Reset camera">
         <RotateCcw className="h-4 w-4" aria-hidden />
       </button>

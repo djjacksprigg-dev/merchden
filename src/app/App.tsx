@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { hostDownloadsReady, isFramed } from '../lib/utils'
-import { LoaderCircle, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { TopBar } from '../components/layout/TopBar'
 import { CatalogueSidebar } from '../components/catalogue/CatalogueSidebar'
 import { DesignSidebar } from '../components/layout/DesignSidebar'
@@ -10,7 +10,8 @@ import { BusyOverlay, HelpModal, Toasts } from '../components/ui/Feedback'
 import { useStudio } from '../state/studio'
 
 export function App() {
-  const hydrated = useStudio((s) => s.hydrated)
+  const leftCollapsed = useStudio((s) => s.leftCollapsed)
+  const rightCollapsed = useStudio((s) => s.rightCollapsed)
   const mobilePanel = useStudio((s) => s.mobilePanel)
   const setMobilePanel = useStudio((s) => s.setMobilePanel)
   const [framed, setFramed] = useState(false)
@@ -32,17 +33,9 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [setMobilePanel])
 
-  if (!hydrated) {
-    return (
-      <div className="flex h-full items-center justify-center bg-navy-950 text-sm text-slate-300">
-        <LoaderCircle className="mr-2 h-4 w-4 animate-spin text-accent" aria-hidden /> Opening the studio…
-      </div>
-    )
-  }
-
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <a href="#design-controls" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[80] focus:rounded focus:bg-accent focus:px-3 focus:py-2 focus:text-white">
+      <a href="#design-controls" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[80] focus:rounded focus:bg-accent focus:px-3 focus:py-2 focus:text-navy-950">
         Skip to design controls
       </a>
       <TopBar />
@@ -56,7 +49,7 @@ export function App() {
         <aside
           className={`${
             mobilePanel === 'catalogue' ? 'translate-x-0' : '-translate-x-full'
-          } absolute inset-y-0 left-0 z-30 w-[min(20rem,88vw)] border-r border-white/8 bg-navy-900 transition-transform duration-200 lg:static lg:z-auto lg:w-72 lg:translate-x-0 xl:w-80`}
+          } absolute inset-y-0 left-0 z-30 w-[min(20rem,88vw)] border-r border-white/8 bg-navy-900 transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0 ${leftCollapsed ? 'lg:hidden' : 'lg:w-72 xl:w-80'}`}
           aria-label="Merchandise catalogue"
         >
           <div className="flex items-center justify-between border-b border-white/6 px-3 py-2 lg:hidden">
@@ -80,7 +73,7 @@ export function App() {
           id="design-controls"
           className={`${
             mobilePanel === 'design' ? 'translate-x-0' : 'translate-x-full'
-          } absolute inset-y-0 right-0 z-30 w-[min(22rem,92vw)] border-l border-white/8 bg-navy-900 transition-transform duration-200 lg:static lg:z-auto lg:w-[22rem] lg:translate-x-0`}
+          } absolute inset-y-0 right-0 z-30 w-[min(22rem,92vw)] border-l border-white/8 bg-navy-900 transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0 ${rightCollapsed ? 'lg:hidden' : 'lg:w-[22rem]'}`}
           aria-label="Design controls"
         >
           <div className="flex items-center justify-between border-b border-white/6 px-3 py-2 lg:hidden">

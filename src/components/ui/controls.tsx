@@ -1,3 +1,4 @@
+import { useStudio } from '../../state/studio'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { normaliseHex } from '../../lib/utils'
@@ -56,6 +57,7 @@ export const PRESET_COLOURS = [
   '#0b1630',
   '#1d3b8f',
   '#2f8cff',
+  '#ff7a1a',
   '#06b6d4',
   '#10b981',
   '#84cc16',
@@ -117,9 +119,10 @@ export function ColorField({ label, value, onChange }: { label: string; value: s
       </div>
       {error && (
         <p id={`${id}-err`} className="text-xs text-rose-300">
-          Enter a HEX colour like #2F8CFF
+          Enter a HEX colour like #FF7A1A
         </p>
       )}
+      <RecentColours value={value} onPick={onChange} label={label} />
       <div className="flex flex-wrap gap-1.5" role="group" aria-label={`${label} presets`}>
         {PRESET_COLOURS.map((c) => (
           <button
@@ -185,6 +188,26 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
         </div>
         <div className="scroll-thin overflow-y-auto">{children}</div>
       </div>
+    </div>
+  )
+}
+
+function RecentColours({ value, onPick, label }: { value: string; onPick: (hex: string) => void; label: string }) {
+  const recent = useStudio((s) => s.recentColors)
+  if (!recent.length) return null
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={`${label} – recently used colours`}>
+      <span className="mr-0.5 text-[10px] uppercase tracking-wider text-slate-500">Recent</span>
+      {recent.slice(0, 8).map((c) => (
+        <button
+          key={c}
+          type="button"
+          className={`h-5 w-5 rounded-full border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${value.toLowerCase() === c ? 'border-white ring-2 ring-accent' : 'border-white/20'}`}
+          style={{ background: c }}
+          onClick={() => onPick(c)}
+          aria-label={`Use recent colour ${c}`}
+        />
+      ))}
     </div>
   )
 }

@@ -79,6 +79,23 @@ export function CameraRig() {
     }
   })
 
+  // zoom buttons in the toolbar
+  useEffect(() => {
+    const onZoom = (e: Event) => {
+      const f = (e as CustomEvent<number>).detail
+      const c = controls.current
+      if (!c || !f) return
+      anim.current = null
+      const s = new Spherical().setFromVector3(camera.position.clone().sub(c.target))
+      s.radius = Math.min(c.maxDistance, Math.max(c.minDistance, s.radius * f))
+      camera.position.setFromSpherical(s).add(c.target)
+      c.update()
+      invalidate()
+    }
+    window.addEventListener('mf-zoom', onZoom)
+    return () => window.removeEventListener('mf-zoom', onZoom)
+  }, [camera, invalidate])
+
   // stop a running animation when the student grabs the model
   useEffect(() => {
     const c = controls.current

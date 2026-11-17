@@ -352,11 +352,16 @@ export const DEFAULT_VIEWS: Record<ViewName, ViewAngle> = {
   front: { azimuth: 0, polar: 1.48 },
   back: { azimuth: Math.PI, polar: 1.48 },
   side: { azimuth: Math.PI / 2, polar: 1.48 },
+  right: { azimuth: -Math.PI / 2, polar: 1.48 },
   'three-quarter': { azimuth: Math.PI / 4.5, polar: 1.3 },
 }
 
 export function viewFor(def: ProductDef, view: ViewName): ViewAngle {
-  return def.views?.[view] ?? DEFAULT_VIEWS[view]
+  const own = def.views?.[view]
+  if (own) return own
+  // the right view mirrors a product's custom side view
+  if (view === 'right' && def.views?.side) return { ...def.views.side, azimuth: -def.views.side.azimuth }
+  return DEFAULT_VIEWS[view]
 }
 
 /** Cache of built models per product id (built once, reused). */

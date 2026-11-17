@@ -57,30 +57,35 @@ export function HelpModal() {
   const quality = useStudio((s) => s.quality)
   const setQuality = useStudio((s) => s.setQuality)
   return (
-    <Modal open={open} onClose={() => setOpen(false)} title="About Merch Forge Studio">
+    <Modal open={open} onClose={() => setOpen(false)} title="Help – Merch Forge">
       <div className="space-y-5 p-5 text-sm text-slate-300">
         <section>
           <h3 className="mb-1 font-semibold text-white">Quick start</h3>
           <ol className="list-decimal space-y-1 pl-5">
-            <li>Pick a product from the catalogue.</li>
-            <li>Upload your team logo in the Logo tab (or try a sample brand).</li>
-            <li>Choose a placement area, then drag, resize and rotate the logo. Double-clicking the product moves the selected logo to that spot.</li>
-            <li>Set your team colours in the Colours tab.</li>
-            <li>Download PNGs from the Export tab, and Save each product to build your collection.</li>
+            <li>Set up your organisation in the Brand Kit tab: name, logos, colours, font and slogan.</li>
+            <li>Pick a product from the catalogue (or the product menu in the top bar).</li>
+            <li>Upload logos in Graphics, choose a print location, then position, resize, rotate and layer them. Double-click the product to move the selected logo to that spot.</li>
+            <li>Add text, colours and patterns. Use Undo / Redo (Ctrl+Z / Ctrl+Y) freely.</li>
+            <li>Add each finished product to My collection, then export images, a ZIP or a collection board.</li>
           </ol>
         </section>
         <section>
-          <h3 className="mb-1 font-semibold text-white">Free, private and offline-friendly</h3>
-          <p>
-            No account, no payments, no watermarks. Your logos and designs never leave this computer – they're stored in this browser only. Designs don't sync between computers: use Export project /
-            Import project in My designs to move them.
+          <h3 className="mb-1 font-semibold text-white">Your work stays on this computer</h3>
+          <p className="mb-2">
+            Merch Forge has no accounts and no server storage. Your logos, designs and portfolio notes are kept only in this browser tab while you work – nothing is uploaded, tracked or saved
+            in the background.
           </p>
+          <p className="mb-2">
+            <strong className="text-white">To keep your work, press Download project</strong> (Ctrl+S). You get one <code>.merchforge</code> file containing everything. Next lesson, press Import
+            project and choose that file. If you close or refresh the tab without downloading, your changes are gone – the “Unsaved changes” badge in the top bar tells you when you need to download again.
+          </p>
+          <p>Store your project file in your college OneDrive or student drive so it is available on any computer.</p>
         </section>
         <section>
           <h3 className="mb-1 font-semibold text-white">Performance mode</h3>
           <p className="mb-2">Turns off soft shadows and high-resolution rendering for older or low-power computers.</p>
           <label className="flex items-center gap-2">
-            <input type="checkbox" className="accent-[#2f8cff]" checked={quality === 'low'} onChange={(e) => setQuality(e.target.checked ? 'low' : 'high')} />
+            <input type="checkbox" className="accent-[#ff7a1a]" checked={quality === 'low'} onChange={(e) => setQuality(e.target.checked ? 'low' : 'high')} />
             Performance mode {quality === 'low' ? 'on' : 'off'}
           </label>
         </section>
@@ -93,7 +98,7 @@ export function HelpModal() {
         </section>
         <section>
           <h3 className="mb-1 font-semibold text-white">Licences</h3>
-          <p>Built with React, Three.js, React Three Fiber, Drei, Tailwind CSS, Zustand, Lucide, idb-keyval and fflate (MIT / ISC licences). Sample logos are fictional and original. See ASSET_LICENCES.md in the project for the full register.</p>
+          <p>Built with React, Three.js, React Three Fiber, Drei, Tailwind CSS, Zustand, Lucide and fflate (MIT / ISC licences), with fonts from Fontsource (SIL Open Font Licence). Sample logos are fictional and original. See ASSET_LICENCES.md in the project for the full register.</p>
         </section>
       </div>
     </Modal>

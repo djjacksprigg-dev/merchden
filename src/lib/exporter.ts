@@ -24,7 +24,7 @@ function productLabel(d: Design) {
 
 function viewLabel(d: Design, v: ViewName | null) {
   if (!v) return 'Custom'
-  if (v === 'side') return PRODUCT_MAP[d.productId]?.sideLabel ?? 'Side'
+  if (v === 'side') return PRODUCT_MAP[d.productId]?.sideLabel ?? 'Left'
   return VIEW_LABELS[v].replace(/\s+/g, '')
 }
 

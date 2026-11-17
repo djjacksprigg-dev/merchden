@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Design, LogoAsset, LogoLayer, PatternId, ProjectInfo, SavedDesign, StickerShape, TextStyle, ViewName } from '../lib/types'
+import type { BrandKit, Design, LogoAsset, LogoLayer, PatternId, Portfolio, PortfolioProductNotes, PortfolioVersion, ProjectInfo, SavedDesign, StickerShape, TextStyle, ViewName } from '../lib/types'
 import { DEFAULT_TEXT } from '../three/engine/text'
 import type { SceneId } from '../three/scenes'
 import type { Zone } from '../three/engine/types'
@@ -8,7 +8,7 @@ import { uid } from '../lib/utils'
 
 export type ExportBackground = 'scene' | 'black' | 'white' | 'brand' | 'transparent'
 
-export type RightTab = 'logo' | 'text' | 'colour' | 'info' | 'export'
+export type RightTab = 'brand' | 'logo' | 'text' | 'colour' | 'export'
 
 export interface Toast {
   id: string
@@ -16,8 +16,36 @@ export interface Toast {
   text: string
 }
 
+export const DEFAULT_BRAND_KIT: BrandKit = {
+  orgName: '',
+  primaryLogoId: null,
+  secondaryLogoId: null,
+  primary: '#1d2b4f',
+  secondary: '#ff7a1a',
+  accent: '#ffffff',
+  font: 'orbitron',
+  slogan: '',
+}
+
+export const EMPTY_NOTES: PortfolioProductNotes = { why: '', represents: '', appeal: '', improve: '', changes: '', reasons: '', versions: [] }
+export const EMPTY_PORTFOLIO: Portfolio = { studentProject: '', audience: '', products: {}, improvements: '' }
+
 export interface StudioState {
-  hydrated: boolean
+  projectName: string
+  brandKit: BrandKit
+  portfolio: Portfolio
+  recentColors: string[]
+  /** true when the project has changes that are not in a downloaded project file */
+  dirty: boolean
+  savedAt: number | null
+  canUndo: boolean
+  canRedo: boolean
+  leftCollapsed: boolean
+  rightCollapsed: boolean
+  /** drag on the product moves the selected layer instead of rotating */
+  moveTool: boolean
+  portfolioOpen: boolean
+  boardOpen: boolean
   design: Design
   drafts: Record<string, Design>
   selectedLayerId: string | null
@@ -28,7 +56,6 @@ export interface StudioState {
   collection: SavedDesign[]
   quality: 'high' | 'low'
   autoRotate: boolean
-  storageAvailable: boolean
 
   /** Zones of the currently displayed model (published by the viewer) */
   modelZones: Zone[]
@@ -51,6 +78,22 @@ export interface StudioState {
   toasts: Toast[]
 
   // actions
+  setProjectName: (n: string) => void
+  setBrandKit: (patch: Partial<BrandKit>) => void
+  applyBrandKit: (scope: 'current' | 'collection') => void
+  duplicateLayer: (id: string) => void
+  moveLayer: (id: string, dir: -1 | 1) => void
+  renameSaved: (id: string, title: string) => void
+  duplicateSaved: (id: string) => void
+  removeSaved: (id: string) => void
+  moveSaved: (id: string, dir: -1 | 1) => void
+  setPortfolio: (patch: Partial<Portfolio>) => void
+  setProductNotes: (id: string, patch: Partial<PortfolioProductNotes>) => void
+  addVersion: (id: string, v: PortfolioVersion) => void
+  removeVersion: (id: string, versionId: string) => void
+  pushRecentColor: (hex: string) => void
+  markSaved: () => void
+  setPanels: (patch: Partial<Pick<StudioState, 'leftCollapsed' | 'rightCollapsed' | 'moveTool' | 'portfolioOpen' | 'boardOpen'>>) => void
   selectProduct: (id: string) => void
   resetDesign: () => void
   setColor: (slot: string, hex: string) => void
@@ -93,7 +136,7 @@ export interface StudioState {
 }
 
 export function newLayer(zoneId: string, logoId: string | null): LogoLayer {
-  return { id: uid('layer'), logoId, zoneId, offsetX: 0, offsetY: 0, scale: 1, rotation: 0 }
+  return { id: uid('layer'), logoId, zoneId, offsetX: 0, offsetY: 0, scale: 1, rotation: 0, opacity: 1 }
 }
 
 export function createDesign(productId: string, logoId: string | null, brand: StudioState['brandColors']): Design {
@@ -135,8 +178,51 @@ export const useStudio = create<StudioState>()((set, get) => {
       return { design, drafts: { ...s.drafts, [design.productId]: design } }
     })
 
+  /** Applies the brand kit to one design */
+  const brandDesign = (d: Design, kit: BrandKit, logos: Record<string, LogoAsset>): Design => {
+    const def = PRODUCT_MAP[d.productId]
+    const colors = { ...d.colors }
+    const slots = new Set(def.colorSlots.map((c) => c.id))
+    const oldPrimary = (colors.primary ?? '').toLowerCase()
+    if (slots.has('primary')) {
+      for (const k of Object.keys(colors)) if (k !== 'primary' && !k.startsWith('pattern') && (colors[k] ?? '').toLowerCase() === oldPrimary) colors[k] = kit.primary
+      colors.primary = kit.primary
+    }
+    if (slots.has('secondary') && d.productId !== 'mug') colors.secondary = kit.secondary
+    if (slots.has('accent')) colors.accent = kit.accent
+    if (slots.has('trim')) colors.trim = kit.accent
+    const pc = def.patternColors
+    if (!pc) {
+      colors.pattern = kit.secondary
+      colors.pattern2 = kit.accent
+    }
+    const primaryLogo = kit.primaryLogoId && logos[kit.primaryLogoId] ? kit.primaryLogoId : null
+    const secondaryLogo = kit.secondaryLogoId && logos[kit.secondaryLogoId] ? kit.secondaryLogoId : null
+    let layers = d.layers.map((l) => {
+      if (l.text) return { ...l, text: { ...l.text, font: l.role === 'player-number' || l.role === 'front-number' ? l.text.font : kit.font } }
+      if (l.role === 'sponsor') return secondaryLogo ? { ...l, logoId: secondaryLogo } : l
+      return primaryLogo ? { ...l, logoId: primaryLogo } : l
+    })
+    if (primaryLogo && !layers.some((l) => !l.text)) {
+      layers = [...layers, ...[def.defaultZone, ...(def.extraDefaultZones ?? [])].map((z) => ({ ...newLayer(z, primaryLogo), role: 'team-logo' as const }))]
+    }
+    return { ...d, colors, layers, updatedAt: Date.now() }
+  }
+
   return {
-    hydrated: false,
+    projectName: 'Untitled project',
+    brandKit: { ...DEFAULT_BRAND_KIT },
+    portfolio: { ...EMPTY_PORTFOLIO, products: {} },
+    recentColors: [],
+    dirty: false,
+    savedAt: null,
+    canUndo: false,
+    canRedo: false,
+    leftCollapsed: false,
+    rightCollapsed: false,
+    moveTool: false,
+    portfolioOpen: false,
+    boardOpen: false,
     design: createDesign(INITIAL_PRODUCT, null, {}),
     drafts: {},
     selectedLayerId: null,
@@ -147,7 +233,6 @@ export const useStudio = create<StudioState>()((set, get) => {
     collection: [],
     quality: 'high',
     autoRotate: false,
-    storageAvailable: true,
     modelZones: [],
     modelProductId: null,
     modelLoading: true,
@@ -162,6 +247,93 @@ export const useStudio = create<StudioState>()((set, get) => {
     helpOpen: false,
     busy: null,
     toasts: [],
+
+    setProjectName: (projectName) => set({ projectName: projectName.slice(0, 80) }),
+    setBrandKit: (patch) => {
+      set((s) => ({ brandKit: { ...s.brandKit, ...patch } }))
+      for (const k of ['primary', 'secondary', 'accent'] as const) if (patch[k]) get().pushRecentColor(patch[k]!)
+      if (patch.orgName !== undefined) set((s) => ({ project: { ...s.project, orgName: patch.orgName! } }))
+    },
+    applyBrandKit: (scope) => {
+      const s = get()
+      const kit = s.brandKit
+      if (scope === 'current') {
+        const design = brandDesign(s.design, kit, s.logos)
+        set({ design, drafts: { ...s.drafts, [design.productId]: design }, brandColors: { primary: kit.primary, secondary: kit.secondary } })
+      } else {
+        set({
+          collection: s.collection.map((d) => ({ ...brandDesign(d, kit, s.logos), thumbnail: d.thumbnail })),
+          brandColors: { primary: kit.primary, secondary: kit.secondary },
+        })
+      }
+    },
+    duplicateLayer: (id) => {
+      const l = get().design.layers.find((x) => x.id === id)
+      if (!l) return
+      const copy: LogoLayer = { ...l, id: uid('layer'), offsetX: Math.max(-1, Math.min(1, l.offsetX + 0.25)), offsetY: Math.max(-1, Math.min(1, l.offsetY - 0.25)), locked: false, role: undefined }
+      patchDesign((d) => {
+        const i = d.layers.findIndex((x) => x.id === id)
+        const layers = [...d.layers]
+        layers.splice(i + 1, 0, copy)
+        return { ...d, layers }
+      })
+      set({ selectedLayerId: copy.id })
+    },
+    moveLayer: (id, dir) =>
+      patchDesign((d) => {
+        const i = d.layers.findIndex((x) => x.id === id)
+        const j = i + dir
+        if (i < 0 || j < 0 || j >= d.layers.length) return d
+        const layers = [...d.layers]
+        ;[layers[i], layers[j]] = [layers[j], layers[i]]
+        return { ...d, layers }
+      }),
+    renameSaved: (id, title) => set((s) => ({ collection: s.collection.map((d) => (d.id === id ? { ...d, title: title.slice(0, 60) } : d)) })),
+    duplicateSaved: (id) =>
+      set((s) => {
+        const i = s.collection.findIndex((d) => d.id === id)
+        if (i < 0) return {}
+        const src = s.collection[i]
+        const copy = { ...src, id: uid('design'), title: `${src.title} copy`.slice(0, 60), createdAt: Date.now(), updatedAt: Date.now(), layers: src.layers.map((l) => ({ ...l, id: uid('layer') })) }
+        const collection = [...s.collection]
+        collection.splice(i + 1, 0, copy)
+        return { collection }
+      }),
+    removeSaved: (id) =>
+      set((s) => {
+        const products = { ...s.portfolio.products }
+        delete products[id]
+        return { collection: s.collection.filter((d) => d.id !== id), portfolio: { ...s.portfolio, products } }
+      }),
+    moveSaved: (id, dir) =>
+      set((s) => {
+        const i = s.collection.findIndex((d) => d.id === id)
+        const j = i + dir
+        if (i < 0 || j < 0 || j >= s.collection.length) return {}
+        const collection = [...s.collection]
+        ;[collection[i], collection[j]] = [collection[j], collection[i]]
+        return { collection }
+      }),
+    setPortfolio: (patch) => set((s) => ({ portfolio: { ...s.portfolio, ...patch } })),
+    setProductNotes: (id, patch) =>
+      set((s) => ({ portfolio: { ...s.portfolio, products: { ...s.portfolio.products, [id]: { ...EMPTY_NOTES, ...s.portfolio.products[id], ...patch } } } })),
+    addVersion: (id, v) =>
+      set((s) => {
+        const cur = { ...EMPTY_NOTES, ...s.portfolio.products[id] }
+        return { portfolio: { ...s.portfolio, products: { ...s.portfolio.products, [id]: { ...cur, versions: [...cur.versions, v].slice(-4) } } } }
+      }),
+    removeVersion: (id, versionId) =>
+      set((s) => {
+        const cur = { ...EMPTY_NOTES, ...s.portfolio.products[id] }
+        return { portfolio: { ...s.portfolio, products: { ...s.portfolio.products, [id]: { ...cur, versions: cur.versions.filter((v) => v.id !== versionId) } } } }
+      }),
+    pushRecentColor: (hex) =>
+      set((s) => {
+        const h = hex.toLowerCase()
+        return { recentColors: [h, ...s.recentColors.filter((c) => c !== h)].slice(0, 12) }
+      }),
+    markSaved: () => set({ dirty: false, savedAt: Date.now() }),
+    setPanels: (patch) => set(patch),
 
     selectProduct: (id) => {
       const s = get()
@@ -196,6 +368,7 @@ export const useStudio = create<StudioState>()((set, get) => {
     },
 
     setColor: (slot, hex) => {
+      get().pushRecentColor(hex)
       patchDesign((d) => {
         const colors = { ...d.colors, [slot]: hex }
         // parts currently matching the main colour (cuffs, linings, collars) follow it
@@ -245,11 +418,17 @@ export const useStudio = create<StudioState>()((set, get) => {
     useCustomPattern: (id) => patchDesign((d) => ({ ...d, pattern: 'custom', customPatternId: id })),
     setCustomPatternMode: (customPatternMode) => patchDesign((d) => ({ ...d, customPatternMode })),
     removeLayer: (id) => {
+      if (get().design.layers.find((l) => l.id === id)?.locked) return
       patchDesign((d) => ({ ...d, layers: d.layers.filter((l) => l.id !== id) }))
       const rest = get().design.layers
       set({ selectedLayerId: rest[rest.length - 1]?.id ?? null })
     },
-    updateLayer: (id, patch) => patchDesign((d) => ({ ...d, layers: d.layers.map((l) => (l.id === id ? { ...l, ...patch } : l)) })),
+    updateLayer: (id, patch) =>
+      patchDesign((d) => ({
+        ...d,
+        // a locked layer only accepts unlocking (and logo swaps from the library)
+        layers: d.layers.map((l) => (l.id !== id ? l : l.locked && !('locked' in patch) && !('logoId' in patch) ? l : { ...l, ...patch })),
+      })),
     resetLayerPosition: (id) => get().updateLayer(id, { offsetX: 0, offsetY: 0, scale: 1, rotation: 0 }),
     selectLayer: (id) => set({ selectedLayerId: id }),
 
@@ -299,7 +478,8 @@ export const useStudio = create<StudioState>()((set, get) => {
       if (usedInCollection) get().toast('Logo removed from your library. Saved designs that use it keep their copy.', 'info')
     },
 
-    setProject: (patch) => set((s) => ({ project: { ...s.project, ...patch } })),
+    setProject: (patch) =>
+      set((s) => ({ project: { ...s.project, ...patch }, ...(patch.orgName !== undefined ? { brandKit: { ...s.brandKit, orgName: patch.orgName } } : {}) })),
     setCollection: (collection) => set({ collection }),
     editSaved: (id) => {
       const s = get()

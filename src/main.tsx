@@ -13,7 +13,7 @@ import '@fontsource/teko/latin-600.css'
 import '@fontsource/press-start-2p/latin-400.css'
 import './index.css'
 import { App } from './app/App'
-import { hydrate, startAutosave } from './storage/db'
+import { startHistory } from './state/history'
 import { useStudio } from './state/studio'
 
 /** Pick performance mode automatically on obviously low-power devices. */
@@ -32,26 +32,19 @@ function detectLowPower(): boolean {
   return false
 }
 
-async function boot() {
-  let firstVisit = false
-  try {
-    firstVisit = !localStorage.getItem('mf-visited')
-  } catch {
-    /* storage blocked */
+function boot() {
+  // Privacy: nothing is read from or written to browser storage. Work lives in
+  // memory only; students keep it by downloading a .merchforge project file.
+  if (detectLowPower()) {
+    useStudio.getState().setQuality('low')
+    useStudio.getState().toast('Performance mode is on for this computer. You can change it in Help.', 'info')
   }
-  await hydrate()
-  if (firstVisit) {
-    try {
-      localStorage.setItem('mf-visited', '1')
-    } catch {
-      /* ignore */
-    }
-    if (detectLowPower()) {
-      useStudio.getState().setQuality('low')
-      useStudio.getState().toast('Performance mode is on for this computer. You can change it in Help.', 'info')
-    }
-  }
-  startAutosave()
+  startHistory()
+  window.addEventListener('beforeunload', (e) => {
+    if (!useStudio.getState().dirty) return
+    e.preventDefault()
+    e.returnValue = ''
+  })
 }
 
 createRoot(document.getElementById('root')!).render(
@@ -59,7 +52,4 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
-boot().catch((e) => {
-  console.error(e)
-  useStudio.setState({ hydrated: true })
-})
+boot()
