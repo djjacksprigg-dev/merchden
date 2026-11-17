@@ -88,7 +88,7 @@ export function PortfolioPanel() {
 
   return (
     <aside
-      className="fixed inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col border-l border-white/10 bg-navy-900 shadow-2xl"
+      className="fixed inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col border-l border-white/10 bg-navy-900 shadow-2xl lg:static lg:z-auto lg:w-[24rem] lg:max-w-none lg:shrink-0 lg:shadow-none xl:w-[26rem]"
       aria-label="Student portfolio"
       role="complementary"
     >

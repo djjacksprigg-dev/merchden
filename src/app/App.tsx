@@ -89,6 +89,8 @@ export function App() {
           </div>
         </aside>
 
+        <PortfolioPanel />
+
         {mobilePanel && <div className="absolute inset-0 z-20 bg-black/50 lg:hidden" onClick={() => setMobilePanel(null)} aria-hidden />}
 
         {/* mobile quick bar */}
@@ -103,7 +105,6 @@ export function App() {
       </div>
       <CollectionModal />
       <BoardModal />
-      <PortfolioPanel />
       <HelpModal />
       <BusyOverlay />
       <Toasts />

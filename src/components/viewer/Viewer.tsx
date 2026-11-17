@@ -125,7 +125,7 @@ function ViewControls() {
     [def],
   )
   return (
-    <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-white/10 bg-navy-900/85 p-1 shadow-lg backdrop-blur" role="toolbar" aria-label="Camera views">
+    <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-white/10 bg-navy-900/85 p-1 shadow-lg backdrop-blur" role="toolbar" aria-label="Camera views" style={{ whiteSpace: 'nowrap' }}>
       {views.map((v) => (
         <button key={v.id} type="button" className="view-btn" onClick={() => requestView(v.id)} aria-label={`${v.id === 'three-quarter' ? 'Three-quarter' : v.id === 'side' && !def.sideLabel && !def.sideLabels ? 'Left side' : v.id === 'right' && !def.sideLabels ? 'Right side' : v.label} view`}>
           {v.label}

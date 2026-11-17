@@ -103,7 +103,7 @@ export function TopBar() {
   }
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-1.5 border-b border-white/8 bg-navy-900 px-2 sm:px-3">
+    <header className="flex h-14 shrink-0 items-center gap-1.5 whitespace-nowrap border-b border-white/8 bg-navy-900 px-2 sm:px-3">
       <div className="flex shrink-0 items-center gap-2 pr-1">
         <StudioMark />
         <p className="hidden whitespace-nowrap text-sm font-semibold tracking-tight text-white xl:block">Merch Forge</p>
@@ -176,7 +176,7 @@ export function TopBar() {
         <button
           type="button"
           className="btn-ghost hidden px-2 sm:inline-flex"
-          onClick={() => setPanels({ portfolioOpen: !portfolioOpen })}
+          onClick={() => setPanels(portfolioOpen ? { portfolioOpen: false } : { portfolioOpen: true, leftCollapsed: true })}
           aria-pressed={portfolioOpen}
           aria-label="Student portfolio mode"
           title="Portfolio mode"
@@ -190,7 +190,7 @@ export function TopBar() {
         </button>
         <button type="button" className="btn-ghost px-2" onClick={startImport} aria-label="Import project" title={`Import project (${PROJECT_EXT})`}>
           <Upload className="h-4 w-4" aria-hidden />
-          <span className="hidden xl:inline">Import</span>
+          <span className="hidden 2xl:inline">Import</span>
         </button>
         <input
           ref={fileRef}
@@ -206,11 +206,11 @@ export function TopBar() {
         />
         <button type="button" className="btn-secondary px-2.5" onClick={downloadProject} aria-label="Download project file (Ctrl+S)" title="Download project file (Ctrl+S)">
           <Download className="h-4 w-4" aria-hidden />
-          <span className="hidden xl:inline">Download project</span>
+          <span className="hidden 2xl:inline">Download project</span>
         </button>
         <button type="button" className="btn-primary px-2.5" onClick={exportDesigns} aria-label="Export designs">
           <ImageDown className="h-4 w-4" aria-hidden />
-          <span className="hidden lg:inline">Export designs</span>
+          <span className="hidden xl:inline">Export designs</span>
         </button>
         <button type="button" className="btn-ghost px-2" onClick={() => setHelpOpen(true)} aria-label="Help, privacy and licences" title="Help">
           <HelpCircle className="h-4 w-4" aria-hidden />

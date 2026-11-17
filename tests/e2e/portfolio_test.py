@@ -1,0 +1,68 @@
+"""Test F – Student Portfolio Mode."""
+import os, json, asyncio
+from playwright.async_api import async_playwright
+CHROME = os.environ.get('CHROME_PATH', '/usr/bin/google-chrome')
+os.makedirs('shots', exist_ok=True); os.makedirs('dl', exist_ok=True)
+R = []
+def ok(n, c, e=''): R.append(('PASS' if c else 'FAIL', n, str(e)[:260]))
+async def main():
+    async with async_playwright() as p:
+        b = await p.chromium.launch(executable_path=CHROME, args=['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'])
+        ctx = await b.new_context(viewport={'width': 1440, 'height': 900}, accept_downloads=True)
+        pg = await ctx.new_page()
+        errs = []; csp = []
+        pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: (errs.append(m.text) if m.type == 'error' else None, csp.append(m.text) if 'Content Security Policy' in m.text else None))
+        await pg.goto('http://localhost:4173/'); await pg.wait_for_selector('canvas'); await pg.wait_for_timeout(2000)
+        await pg.set_input_files('input[aria-label="Upload logo file"]', 'files/team_logo.png'); await pg.wait_for_timeout(1500)
+        await pg.get_by_role('tab', name='Brand Kit').click()
+        await pg.get_by_label('Primary logo').select_option(await pg.evaluate("__studio.getState().activeLogoId"))
+        await pg.get_by_role('button', name='Add this product to My collection').click(); await pg.wait_for_timeout(3500)
+        await pg.get_by_role('button', name='Student portfolio mode').click(); await pg.wait_for_timeout(500)
+        panel = pg.get_by_role('complementary', name='Student portfolio')
+        ok('Portfolio panel opens', await panel.count() == 1)
+        empty = await pg.evaluate("(()=>{const p=__studio.getState().portfolio;return !p.audience && !p.improvements && Object.keys(p.products).length===0})()")
+        ok('No answers are pre-written', empty)
+        await panel.get_by_role('textbox', name='Esports organisation name', exact=True).fill('Seaside Sentinels')
+        await panel.get_by_role('textbox', name='Project title', exact=True).fill('Unit 7 Merchandise Range')
+        await panel.get_by_role('button', name='My target audience is…').click()
+        ta = panel.get_by_role('textbox', name='Target audience', exact=True)
+        await ta.press('End'); await ta.type('college esports players aged 16 to 19.')
+        aud = await pg.evaluate("__studio.getState().portfolio.audience")
+        ok('Sentence starter inserts only a stem; student writes the rest', aud == 'My target audience is college esports players aged 16 to 19.', aud)
+        await panel.get_by_role('textbox', name='Why I chose this product', exact=True).fill('Hoodies are worn every day at college so the brand is seen a lot.')
+        await panel.get_by_role('textbox', name='How it represents the brand', exact=True).fill('The shield logo sits on the chest in our team colours.')
+        await panel.get_by_role('textbox', name='Why it would appeal to the audience', exact=True).fill('Students like oversized comfortable hoodies.')
+        await panel.get_by_role('textbox', name='What I would improve', exact=True).fill('Add a sleeve print.')
+        # editor still usable while the panel is open
+        await pg.get_by_role('button', name='Front view').click(); await pg.wait_for_timeout(800)
+        await panel.get_by_role('button', name='Capture version').click(); await pg.wait_for_timeout(2500)
+        await pg.evaluate("__studio.getState().setColor('primary', '#7a1f2b')"); await pg.wait_for_timeout(1200)
+        await panel.get_by_role('button', name='Capture version').click(); await pg.wait_for_timeout(2500)
+        nv = await pg.evaluate("Object.values(__studio.getState().portfolio.products)[0].versions.map(v=>[v.label,v.design.colors.primary,v.image.slice(0,23)])")
+        ok('Two versions captured with images and design snapshots', len(nv) == 2 and nv[0][1] != nv[1][1] and nv[0][2] == 'data:image/jpeg;base64,', nv)
+        await panel.get_by_role('textbox', name='What changed between versions', exact=True).fill('I changed the main colour from charcoal to maroon.')
+        await panel.get_by_role('textbox', name='Why I made the changes', exact=True).fill('Maroon matches the seaside theme better.')
+        await panel.get_by_role('textbox', name='Improvements to the whole range', exact=True).fill('Add matching caps and stickers.')
+        await pg.screenshot(path='shots/portfolio_panel.png')
+        async with pg.expect_download(timeout=120000) as d:
+            await panel.get_by_role('button', name='Download portfolio (PDF)').click()
+        v = await d.value; path = 'dl/' + v.suggested_filename; await v.save_as(path)
+        from pypdf import PdfReader
+        r = PdfReader(path); text = '\n'.join(pg_.extract_text() for pg_ in r.pages)
+        ok('Portfolio PDF exported in-browser', path.endswith('Seaside-Sentinels_Portfolio.pdf') and len(r.pages) >= 3, (path, len(r.pages)))
+        ok('PDF contains the student\'s own answers and version notes', all(t in text for t in ['Seaside Sentinels', 'Unit 7 Merchandise Range', 'college esports players aged 16 to 19', 'worn every day at college', 'charcoal to maroon', 'Version 2', 'matching caps']), text[:300])
+        # saved in project file
+        async with pg.expect_download() as d:
+            await pg.get_by_role('button', name='Download project file (Ctrl+S)').click()
+        v = await d.value; proj = 'dl/' + v.suggested_filename; await v.save_as(proj)
+        data = json.load(open(proj))
+        ok('Portfolio stored in project file', data['portfolio']['studentProject'] == 'Unit 7 Merchandise Range' and len(list(data['portfolio']['products'].values())[0]['versions']) == 2)
+        await pg.reload(); await pg.wait_for_selector('canvas'); await pg.wait_for_timeout(1500)
+        await pg.set_input_files('input[aria-label="Choose a project file to import"]', proj); await pg.wait_for_timeout(3000)
+        back = await pg.evaluate("(()=>{const p=__studio.getState().portfolio;const n=Object.values(p.products)[0];return [p.audience, n.changes, n.versions.length]})()")
+        ok('Portfolio restored on import', back == ['My target audience is college esports players aged 16 to 19.', 'I changed the main colour from charcoal to maroon.', 2], back)
+        ok('No errors / CSP violations (jsPDF runs under the CSP)', not errs and not csp, (errs + csp)[:3])
+        await b.close()
+    for s, n, e in R: print(s, n, e if s == 'FAIL' else '')
+    print(f"{sum(r[0]=='PASS' for r in R)}/{len(R)} passed")
+asyncio.run(main())
