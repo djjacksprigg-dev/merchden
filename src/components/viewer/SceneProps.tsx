@@ -6,7 +6,7 @@
  * It is hidden for product-only and plain-colour exports.
  */
 import { useMemo } from 'react'
-import { CanvasTexture, CatmullRomCurve3, RepeatWrapping, SRGBColorSpace, TorusGeometry, TubeGeometry, Vector3, type Texture } from 'three'
+import { type BufferGeometry, CanvasTexture, CatmullRomCurve3, RepeatWrapping, SRGBColorSpace, TorusGeometry, TubeGeometry, Vector3, type Texture } from 'three'
 import type { SceneId } from '../../three/scenes'
 import { useStudio } from '../../state/studio'
 
@@ -406,26 +406,71 @@ function AcrylicStand({ f }: { f: Frame }) {
   )
 }
 
-function Hanger({ f, wood }: { f: Frame; wood: boolean }) {
+/**
+ * Works out where a hanger sits inside the garment: for points across the
+ * shoulders it finds the top of the garment's own body surface and keeps the
+ * hanger bar safely beneath it, centred between front and back, so it never
+ * pokes through the fabric. The wire neck rises out of the front of the neck opening.
+ */
+function hangerPath(f: Frame, body: BufferGeometry | undefined) {
   const { k } = f
-  const height = f.top - f.floor
-  const neckY = f.top - height * 0.035
+  const fallbackNeck = f.top - (f.top - f.floor) * 0.035
+  const zMid = (f.front + f.back) / 2
+  if (!body) return { pts: [] as Vector3[], neck: new Vector3(0, fallbackNeck, zMid) }
+  const pos = body.getAttribute('position')
+  const cx = f.cx
+  const halfSpan = f.halfW * 0.4
+  const N = 13
+  const bins = Array.from({ length: N }, () => ({ top: -Infinity, zLo: Infinity, zHi: -Infinity }))
+  const tol = (halfSpan * 2) / (N - 1) / 1.5
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i) - cx
+    if (Math.abs(x) > halfSpan + tol) continue
+    const bi = Math.round(((x + halfSpan) / (2 * halfSpan)) * (N - 1))
+    if (bi < 0 || bi >= N) continue
+    const y = pos.getY(i)
+    const b = bins[bi]
+    if (y > b.top) b.top = y
+  }
+  // front/back of the cloth just below the top at each slice
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i) - cx
+    const bi = Math.round(((x + halfSpan) / (2 * halfSpan)) * (N - 1))
+    if (bi < 0 || bi >= N || Math.abs(x - (-halfSpan + (bi * 2 * halfSpan) / (N - 1))) > tol) continue
+    const b = bins[bi]
+    const y = pos.getY(i)
+    if (y < b.top - 0.08 * k || y > b.top - 0.02 * k) continue
+    const z = pos.getZ(i)
+    b.zLo = Math.min(b.zLo, z)
+    b.zHi = Math.max(b.zHi, z)
+  }
+  const margin = 0.045 * k
+  const pts: Vector3[] = []
+  bins.forEach((b, i) => {
+    if (!Number.isFinite(b.top)) return
+    const x = cx - halfSpan + (i * 2 * halfSpan) / (N - 1)
+    const z = Number.isFinite(b.zLo) ? (b.zLo + b.zHi) / 2 : zMid
+    pts.push(new Vector3(x, b.top - margin, z))
+  })
+  // the neck opening: lowest top point near the centre, wire rises from its front half
+  const centre = bins[Math.floor(N / 2)]
+  const neckY = Number.isFinite(centre.top) ? centre.top : fallbackNeck
+  const neckZ = Number.isFinite(centre.zLo) ? centre.zLo + (centre.zHi - centre.zLo) * 0.6 : zMid
+  return { pts, neck: new Vector3(cx, neckY - margin * 0.6, neckZ) }
+}
+
+function Hanger({ f, wood, body }: { f: Frame; wood: boolean; body?: BufferGeometry }) {
+  const { k } = f
   const railY = f.top + 0.12 * k
-  const z = (f.front + f.back) / 2 + (f.front - f.back) * 0.08
+  const railZ = (f.front + f.back) / 2 + (f.front - f.back) * 0.08
   const geo = useMemo(() => {
-    const shoulder = f.halfW * 0.42
-    const bar = new TubeGeometry(
-      new CatmullRomCurve3([new Vector3(-shoulder, neckY - 0.05 * k, z), new Vector3(-shoulder * 0.45, neckY - 0.02 * k, z), new Vector3(0, neckY - 0.008 * k, z), new Vector3(shoulder * 0.45, neckY - 0.02 * k, z), new Vector3(shoulder, neckY - 0.05 * k, z)]),
-      48,
-      (wood ? 0.012 : 0.004) * k,
-      12,
-      false,
-    )
-    // wire stem and hook over the rail
+    const { pts, neck } = hangerPath(f, body)
+    const bar = pts.length >= 4 ? new TubeGeometry(new CatmullRomCurve3(pts), 48, (wood ? 0.011 : 0.004) * k, 12, false) : null
     const rr = 0.016 * k
+    // wire: from inside the collar, up through the neck opening, curving to the rail
     const stem = new TubeGeometry(
-      new CatmullRomCurve3([new Vector3(0, neckY - 0.01 * k, z), new Vector3(0, railY - 0.06 * k, z), new Vector3(0, railY - 0.02 * k, z + 0.004 * k)]),
-      24,
+      new CatmullRomCurve3([neck.clone(), new Vector3(neck.x, neck.y + 0.06 * k, neck.z), new Vector3(neck.x, railY - 0.05 * k, (neck.z + railZ) / 2), new Vector3(neck.x, railY - 0.02 * k, railZ + 0.004 * k)]),
+      32,
       0.0028 * k,
       8,
       false,
@@ -433,14 +478,16 @@ function Hanger({ f, wood }: { f: Frame; wood: boolean }) {
     const hook = new TorusGeometry(rr + 0.004 * k, 0.0028 * k, 8, 32, Math.PI * 1.3)
     hook.rotateY(Math.PI / 2)
     hook.rotateX(Math.PI * 0.6)
-    hook.translate(0, railY, z - 0.001 * k)
+    hook.translate(neck.x, railY, railZ - 0.001 * k)
     return { bar, stem, hook }
-  }, [f.halfW, neckY, railY, z, k, wood])
+  }, [f, body, railY, railZ, k, wood])
   return (
     <group>
-      <mesh geometry={geo.bar} castShadow>
-        <meshStandardMaterial color={wood ? '#b58a5c' : '#d6d9df'} roughness={wood ? 0.55 : 0.2} metalness={wood ? 0 : 1} />
-      </mesh>
+      {geo.bar && (
+        <mesh geometry={geo.bar}>
+          <meshStandardMaterial color={wood ? '#b58a5c' : '#d6d9df'} roughness={wood ? 0.55 : 0.2} metalness={wood ? 0 : 1} />
+        </mesh>
+      )}
       <mesh geometry={geo.stem} castShadow>
         <meshStandardMaterial {...CHROME} />
       </mesh>
@@ -576,7 +623,7 @@ function RoomFloor({ f }: { f: Frame }) {
   )
 }
 
-export function SceneProps({ scene, productId, box }: { scene: SceneId; productId: string; box: Box; radius: number }) {
+export function SceneProps({ scene, productId, box, body }: { scene: SceneId; productId: string; box: Box; radius: number; body?: BufferGeometry }) {
   const frame = useMemo<Frame>(() => {
     const size = Math.max(box.max[0] - box.min[0], box.max[1] - box.min[1], box.max[2] - box.min[2])
     const k = size / (REAL[productId] ?? 0.3)
@@ -597,7 +644,7 @@ export function SceneProps({ scene, productId, box }: { scene: SceneId; productI
     <group name="scene-props">
       {hung ? (
         <>
-          <Hanger f={frame} wood={scene !== 'desk'} />
+          <Hanger f={frame} wood={scene !== 'desk'} body={body} />
           <ClothesRail f={frame} freestanding={scene === 'exhibition'} wall={scene === 'display' ? 'slat' : scene === 'desk' ? 'desk' : 'booth'} />
         </>
       ) : FLOOR.has(productId) ? (

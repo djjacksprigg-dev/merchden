@@ -221,7 +221,7 @@ export function ProductStage({ onFloor }: { onFloor: (y: number, radius: number)
   return (
     <group ref={group}>
       <group position={[-center[0], -center[1], -center[2]]}>
-        <SceneProps scene={sceneId} productId={def.id} box={loaded.box} radius={loaded.radius} />
+        <SceneProps scene={sceneId} productId={def.id} box={loaded.box} radius={loaded.radius} body={model.parts.find((p) => p.key === 'body')?.geometry} />
         {model.parts.map((part) => (
           <PartMesh key={part.key} part={part} def={def} design={design} quality={quality} zones={model.zones} model={model} />
         ))}
